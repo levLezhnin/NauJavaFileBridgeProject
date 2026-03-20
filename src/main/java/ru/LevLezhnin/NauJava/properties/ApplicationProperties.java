@@ -1,4 +1,4 @@
-package ru.LevLezhnin.NauJava;
+package ru.LevLezhnin.NauJava.properties;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.ConfigurationProperties;

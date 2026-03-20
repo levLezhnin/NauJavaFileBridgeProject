@@ -1,0 +1,21 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  datasource:
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 15
+      connection-timeout: 30_000
+      idle-timeout: 30_000
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
