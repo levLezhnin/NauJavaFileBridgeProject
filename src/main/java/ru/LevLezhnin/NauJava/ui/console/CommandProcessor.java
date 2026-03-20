@@ -37,7 +37,7 @@ public class CommandProcessor {
         long id = Long.parseLong(args[1]);
         switch (command) {
             case CREATE -> {
-                userService.createUser(id, args[2], args[3], args[4]);
+                userService.createUser(args[2], args[3], args[4]);
                 System.out.println("Пользователь успешно добавлен");
             }
             case UPDATE_USERNAME -> {
