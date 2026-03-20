@@ -1,11 +1,11 @@
-package ru.LevLezhnin.NauJava.requests.users.findByCriteria;
+package ru.LevLezhnin.NauJava.repository.user.search;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 import ru.LevLezhnin.NauJava.model.User;
 
 @Component
-public class EmailUserSearchStrategy implements UserSearchStrategy {
+public class FindByEmailStrategy implements UserSearchStrategy {
     @Override
     public String getCriteriaKey() {
         return "email";

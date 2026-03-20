@@ -10,7 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
-import ru.LevLezhnin.NauJava.requests.users.findByCriteria.UserSearchStrategy;
+import ru.LevLezhnin.NauJava.repository.user.search.UserSearchStrategy;
+import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
 import ru.LevLezhnin.NauJava.service.interfaces.UserService;
 
 import java.util.List;
@@ -18,17 +19,19 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
-public class UserServiceImplementation implements UserService {
+public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final Map<String, UserSearchStrategy> userSearchStrategyMap;
     private final PasswordEncoder passwordEncryptor;
+    private final StorageQuotaService storageQuotaService;
 
     @Autowired
-    public UserServiceImplementation(UserRepository userRepository, PasswordEncoder passwordEncryptor, List<UserSearchStrategy> userSearchStrategies) {
+    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncryptor, List<UserSearchStrategy> userSearchStrategies, StorageQuotaService storageQuotaService) {
         this.userRepository = userRepository;
         this.passwordEncryptor = passwordEncryptor;
         this.userSearchStrategyMap = userSearchStrategies.stream().collect(Collectors.toMap(UserSearchStrategy::getCriteriaKey, s -> s));
+        this.storageQuotaService = storageQuotaService;
     }
 
     private boolean validate(String username, String email, String password) {
@@ -44,7 +47,7 @@ public class UserServiceImplementation implements UserService {
             throw new IllegalArgumentException("Для нового пользователя должны быть заполнены поля: логин, email, пароль");
         }
 
-        StorageQuota storageQuota = QuotaTariffs.BASIC.getBasicQuotaBuilder().build();
+        StorageQuota storageQuota = storageQuotaService.getQuotaBuilder(QuotaTariffs.BASIC).build();
 
         User user = User.builder()
                 .setUsername(username)

@@ -1,20 +1,18 @@
-package ru.LevLezhnin.NauJava.requests.users.findByCriteria;
+package ru.LevLezhnin.NauJava.repository.user.search;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 import ru.LevLezhnin.NauJava.model.User;
 
 @Component
-public class IdUserSearchStrategy implements UserSearchStrategy {
+public class FindAllStrategy implements UserSearchStrategy {
     @Override
     public String getCriteriaKey() {
-        return "id";
+        return "all";
     }
 
     @Override
     public Specification<User> getSpecification(String searchValue) {
-        return (root, query, criteriaBuilder) -> {
-            return criteriaBuilder.equal(root.get("id"), Long.parseLong(searchValue));
-        };
+        return Specification.unrestricted();
     }
 }

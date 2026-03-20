@@ -10,9 +10,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import ru.LevLezhnin.NauJava.config.DataSizeConstants;
+import org.springframework.transaction.annotation.Transactional;
+import ru.LevLezhnin.NauJava.utils.DataSizeConstants;
 import ru.LevLezhnin.NauJava.model.*;
-import ru.LevLezhnin.NauJava.repository.custom.UserRepositoryImplementation;
+import ru.LevLezhnin.NauJava.repository.custom.UserRepositoryImpl;
 import ru.LevLezhnin.NauJava.repository.jpa.FileRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.UserBanRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
@@ -27,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @SpringJUnitConfig
-@Import(UserRepositoryImplementation.class)
+@Import(UserRepositoryImpl.class)
 @ActiveProfiles("test")
 public class UserRepositoryTest {
 
@@ -38,7 +39,7 @@ public class UserRepositoryTest {
     private UserRepository userRepository;
 
     @Autowired
-    private UserRepositoryImplementation userRepositoryCustom;
+    private UserRepositoryImpl userRepositoryCustom;
 
     @Autowired
     private UserBanRepository userBanRepository;
@@ -293,7 +294,7 @@ public class UserRepositoryTest {
      * Положительный кейс
      */
     @Test
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     void testTransactionalFileCreationAndQuotaUpdate() {
         // Given
         User author = testUser1;
@@ -342,7 +343,7 @@ public class UserRepositoryTest {
      * Пытаемся создать файл, но превышаем квоту
      */
     @Test
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     void testTransactionalFileCreationWithQuotaExceeded() {
         // Given
         User author = testUser1;
@@ -401,7 +402,7 @@ public class UserRepositoryTest {
      * Положительный кейс
      */
     @Test
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     void testTransactionalUserDeletionWithCascade() {
         // Given
         Long userId = testUser1.getId();
@@ -426,7 +427,7 @@ public class UserRepositoryTest {
      * Отрицательный кейс
      */
     @Test
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     void testTransactionalOperationWithRollback() {
         // Given
         User author = testUser1;

@@ -15,12 +15,12 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public class UserRepositoryImplementation implements UserRepositoryCustom {
+public class UserRepositoryImpl implements UserRepositoryCustom {
 
     private final EntityManager entityManager;
 
     @Autowired
-    public UserRepositoryImplementation(EntityManager entityManager) {
+    public UserRepositoryImpl(EntityManager entityManager) {
         this.entityManager = entityManager;
     }
 

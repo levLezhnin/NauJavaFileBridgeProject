@@ -26,3 +26,8 @@ spring:
 app:
   name: File Bridge
   version: 1.0
+
+  quotas:
+    BASIC:
+      max-storage-size: 1GB
+      max-file-size: 100MB

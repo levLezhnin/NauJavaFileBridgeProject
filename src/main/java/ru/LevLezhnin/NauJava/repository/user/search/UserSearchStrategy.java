@@ -1,4 +1,4 @@
-package ru.LevLezhnin.NauJava.requests.users.findByCriteria;
+package ru.LevLezhnin.NauJava.repository.user.search;
 
 import org.springframework.data.jpa.domain.Specification;
 import ru.LevLezhnin.NauJava.model.User;

@@ -1,4 +1,4 @@
-package ru.LevLezhnin.NauJava.config;
+package ru.LevLezhnin.NauJava.utils;
 
 public class DataSizeConstants {
     public static final long KB = 1024;
