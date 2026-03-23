@@ -23,6 +23,12 @@ spring:
     properties:
       hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
 
+minio:
+  url: http://${MINIO_HOST}:${MINIO_PORT}
+  accessKey: ${MINIO_ACCESS_KEY}
+  secretKey: ${MINIO_SECRET_KEY}
+  bucket: ${MINIO_BUCKET}
+
 app:
   name: File Bridge
   version: 1.0

@@ -2,6 +2,7 @@ package ru.LevLezhnin.NauJava.service.implementations;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.model.StorageQuota;
 import ru.LevLezhnin.NauJava.properties.QuotaProperties;
 import ru.LevLezhnin.NauJava.repository.jpa.StorageQuotaRepository;
@@ -21,6 +22,6 @@ public class StorageQuotaServiceImpl extends AbstractStorageQuotaService {
     @Override
     public StorageQuota getUserStorageQuota(Long userId) {
         return storageQuotaRepository.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Квота для пользователя с id: " + userId + " не найдена"));
+                .orElseThrow(() -> new EntityNotFoundException("Квота для пользователя с id: " + userId + " не найдена"));
     }
 }
