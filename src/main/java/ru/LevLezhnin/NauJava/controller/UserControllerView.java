@@ -11,7 +11,7 @@ import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
 import java.util.List;
 
 @Controller
-@RequestMapping("/api/v1/users/view")
+@RequestMapping("/users")
 public class UserControllerView {
     private final UserRepository userRepository;
 

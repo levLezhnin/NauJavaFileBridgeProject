@@ -4,6 +4,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
@@ -20,6 +21,7 @@ public class BucketValidator {
     private final MinioClient minioClient;
     private final MinioProperties minioProperties;
 
+    @Autowired
     public BucketValidator(MinioClient minioClient, MinioProperties minioProperties) {
         this.minioClient = minioClient;
         this.minioProperties = minioProperties;

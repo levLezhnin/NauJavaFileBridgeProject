@@ -1,5 +1,6 @@
 package ru.LevLezhnin.NauJava.controller;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
 import ru.LevLezhnin.NauJava.model.User;
@@ -13,17 +14,18 @@ import java.util.Optional;
 public class UserController {
     private final UserRepository userRepository;
 
+    @Autowired
     public UserController(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
     @GetMapping("/email")
-    public Optional<User> findByEmail(@RequestBody String email) {
+    public Optional<User> findByEmail(@RequestParam("address") String email) {
         return userRepository.findByEmail(email);
     }
 
     @GetMapping("/username")
-    public List<User> findByUsername(@RequestBody String username,
+    public List<User> findByUsername(@RequestParam("like") String username,
                                      @RequestParam("page_size") int pageSize,
                                      @RequestParam("page") int page) {
         return userRepository.findByUsernameLikeIgnoreCase(username, PageRequest.of(page, pageSize));

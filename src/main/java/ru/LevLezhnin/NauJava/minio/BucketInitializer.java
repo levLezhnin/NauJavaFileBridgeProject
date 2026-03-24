@@ -22,6 +22,7 @@ public class BucketInitializer {
     private final MinioClient minioClient;
     private final MinioProperties minioProperties;
 
+    @Autowired
     public BucketInitializer(MinioClient minioClient, MinioProperties minioProperties) {
         this.minioClient = minioClient;
         this.minioProperties = minioProperties;
