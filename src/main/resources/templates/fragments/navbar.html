@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Navbar Fragment</title>
+</head>
+<body>
+<div th:fragment="navbar" class="navbar">
+    <div class="container">
+        <a href="#" class="navbar-brand">File Bridge</a>
+        <ul class="navbar-nav">
+            <li><a href="/files" th:href="@{/files}">Dashboard</a></li>
+            <li><a href="/upload" th:href="@{/upload}">Upload</a></li>
+            <li><a href="/profile" th:href="@{/profile}">Profile</a></li>
+            <li><a href="/admin/users" th:href="@{/admin/users}">Users</a></li>
+            <li><a href="/logout" th:href="@{/logout}">Logout</a></li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>

@@ -20,8 +20,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityWebFilterChain(HttpSecurity http) {
         return http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/**").permitAll()
-                        .anyRequest().authenticated())
+                        .anyRequest().permitAll())
                 .build();
     }
 }
