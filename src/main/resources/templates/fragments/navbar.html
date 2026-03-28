@@ -1,21 +1,18 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title>Navbar Fragment</title>
-</head>
-<body>
-<div th:fragment="navbar" class="navbar">
-    <div class="container">
-        <a href="#" class="navbar-brand">File Bridge</a>
-        <ul class="navbar-nav">
-            <li><a href="/files" th:href="@{/files}">Dashboard</a></li>
-            <li><a href="/upload" th:href="@{/upload}">Upload</a></li>
-            <li><a href="/profile" th:href="@{/profile}">Profile</a></li>
-            <li><a href="/admin/users" th:href="@{/admin/users}">Users</a></li>
-            <li><a href="/logout" th:href="@{/logout}">Logout</a></li>
-        </ul>
-    </div>
+<div th:fragment="navbar">
+    <header class="site-header">
+        <div class="site-brand">
+            <a th:href="@{/}" class="brand-link">File Bridge</a>
+            <span class="brand-caption">Лёгкий обмен файлами</span>
+        </div>
+        <nav class="site-nav" aria-label="Главное меню">
+            <a th:href="@{/}" class="nav-link">Главная</a>
+            <a th:href="@{/files}" class="nav-link auth-only">Файлы</a>
+            <a th:href="@{/upload}" class="nav-link auth-only">Загрузить</a>
+            <a th:href="@{/profile}" class="nav-link auth-only">Профиль</a>
+            <a th:href="@{/users/list}" class="nav-link auth-only">Пользователи</a>
+            <a th:href="@{/login}" class="nav-link guest-only">Войти</a>
+            <a th:href="@{/register}" class="nav-link guest-only">Регистрация</a>
+            <button id="logoutButton" type="button" class="btn btn-secondary auth-only">Выйти</button>
+        </nav>
+    </header>
 </div>
-</body>
-</html>

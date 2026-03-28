@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Скачать файл | File Bridge</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+<main class="page-shell download-shell">
+    <section class="download-card">
+        <div>
+            <p class="eyebrow">Скачать файл</p>
+            <h1>Запрос на загрузку</h1>
+            <p>Введите пароль, если он был установлен для этого файла.</p>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <form id="downloadForm" class="form-card" novalidate>
+            <input type="hidden" id="fileId" th:value="${fileId}" />
+            <div class="form-group">
+                <label for="downloadPassword">Пароль</label>
+                <input id="downloadPassword" name="password" type="password" autocomplete="current-password" />
+            </div>
+            <button type="submit" class="btn btn-primary">Скачать</button>
+            <p class="form-note">Если пароль не требуется, просто нажмите «Скачать».</p>
+        </form>
+    </section>
+</main>
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>

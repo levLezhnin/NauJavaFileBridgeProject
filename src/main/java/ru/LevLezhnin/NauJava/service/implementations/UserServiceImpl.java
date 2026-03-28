@@ -7,12 +7,16 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
+import ru.LevLezhnin.NauJava.dto.user.UpdateUserRequestDto;
+import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
 import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
 import ru.LevLezhnin.NauJava.repository.user.search.UserSearchStrategy;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
 import ru.LevLezhnin.NauJava.service.interfaces.UserService;
+import ru.LevLezhnin.NauJava.utils.RequestContextService;
 
 import java.util.List;
 import java.util.Map;
@@ -22,43 +26,58 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final RequestContextService requestContextService;
     private final Map<String, UserSearchStrategy> userSearchStrategyMap;
     private final PasswordEncoder passwordEncryptor;
     private final StorageQuotaService storageQuotaService;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncryptor, List<UserSearchStrategy> userSearchStrategies, StorageQuotaService storageQuotaService) {
+    public UserServiceImpl(UserRepository userRepository, RequestContextService requestContextService, PasswordEncoder passwordEncryptor, List<UserSearchStrategy> userSearchStrategies, StorageQuotaService storageQuotaService) {
         this.userRepository = userRepository;
+        this.requestContextService = requestContextService;
         this.passwordEncryptor = passwordEncryptor;
         this.userSearchStrategyMap = userSearchStrategies.stream().collect(Collectors.toMap(UserSearchStrategy::getCriteriaKey, s -> s));
         this.storageQuotaService = storageQuotaService;
     }
 
-    private boolean validate(String username, String email, String password) {
-        return (username != null && !username.isBlank())
-                && (email != null && !email.isBlank())
-                && (password != null && !password.isBlank());
+    private void checkUsernameUnique(String username) {
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new IllegalArgumentException("Пользователь с логином '%s' уже существует".formatted(username));
+        }
+    }
+
+    private void checkEmailUnique(String email) {
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new IllegalArgumentException("Пользователь с E-mail-ом '%s' уже существует".formatted(email));
+        }
+    }
+
+    private User getUserByAuthentication() {
+        Long userId = requestContextService.getUserId();
+        return findById(userId);
     }
 
     @Override
     @Transactional
-    public void createUser(String username, String email, String password) {
-        if (!validate(username, email, password)) {
+    public User createUser(RegistrationRequestDto registrationRequestDto) {
+        if (!registrationRequestDto.validate()) {
             throw new IllegalArgumentException("Для нового пользователя должны быть заполнены поля: логин, email, пароль");
         }
+        checkUsernameUnique(registrationRequestDto.username());
+        checkEmailUnique(registrationRequestDto.email());
 
         StorageQuota storageQuota = storageQuotaService.getQuotaBuilder(QuotaTariffs.BASIC).build();
 
         User user = User.builder()
-                .setUsername(username)
-                .setEmail(email)
-                .setPasswordHash(passwordEncryptor.encode(password))
+                .setUsername(registrationRequestDto.username())
+                .setEmail(registrationRequestDto.email())
+                .setPasswordHash(passwordEncryptor.encode(registrationRequestDto.password()))
                 .setRole(UserRole.USER)
                 .setActive(true)
                 .setStorageQuota(storageQuota)
                 .build();
 
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 
     @Override
@@ -69,9 +88,54 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь с логином: '%s' не найден".formatted(username)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь с логином: '%s' не найден".formatted(email)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserProfileResponseDto getProfile() {
+        User user = getUserByAuthentication();
+        return new UserProfileResponseDto(user.getUsername(), user.getEmail(), user.getRegisteredAt());
+    }
+
+    @Override
     @Transactional
-    public void deleteById(long id) {
-        User user = findById(id);
+    public void updateUser(UpdateUserRequestDto updateUserRequestDto) {
+        if (!updateUserRequestDto.validate()) {
+            throw new IllegalArgumentException("При обновлении пользователя должно быть заполнено хотя бы одно из двух: логин, пароль");
+        }
+
+        User user = getUserByAuthentication();
+
+        if (updateUserRequestDto.containsUsername()) {
+            checkUsernameUnique(updateUserRequestDto.username());
+            user.setUsername(updateUserRequestDto.username());
+        }
+
+        if (updateUserRequestDto.containsPassword()) {
+            if (passwordEncryptor.matches(updateUserRequestDto.password(), user.getPasswordHash())) {
+                throw new IllegalArgumentException("Новый пароль должен отличаться от старого");
+            }
+            user.setPasswordHash(passwordEncryptor.encode(updateUserRequestDto.password()));
+        }
+
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser() {
+        User user = getUserByAuthentication();
 
         for (File file : user.getActiveFiles()) {
             file.setAuthor(null);
@@ -91,22 +155,6 @@ public class UserServiceImpl implements UserService {
         user.getBanHistory().clear();
 
         userRepository.delete(user);
-    }
-
-    @Override
-    @Transactional
-    public void updateUsername(long id, String username) {
-        User user = findById(id);
-        user.setUsername(username);
-        userRepository.save(user);
-    }
-
-    @Override
-    @Transactional
-    public void updatePassword(long id, String password) {
-        User user = findById(id);
-        user.setPasswordHash(passwordEncryptor.encode(password));
-        userRepository.save(user);
     }
 
     @Override
