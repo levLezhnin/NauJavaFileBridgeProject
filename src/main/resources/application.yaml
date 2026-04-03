@@ -44,3 +44,8 @@ jwt:
   refreshSecret: ${REFRESH_JWT_SECRET}
   accessTokenLifetime: 30m
   refreshTokenLifetime: 1d
+
+cookie:
+  path: /
+  sameSite: Lax
+  secure: false

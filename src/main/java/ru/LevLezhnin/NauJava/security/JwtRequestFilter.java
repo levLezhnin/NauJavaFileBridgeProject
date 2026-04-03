@@ -13,6 +13,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import ru.LevLezhnin.NauJava.utils.TokenCookieService;
 import ru.LevLezhnin.NauJava.utils.JwtTokenHelper;
 import ru.LevLezhnin.NauJava.utils.RequestContextService;
 
@@ -26,22 +27,34 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
     private final JwtTokenHelper jwtTokenHelper;
     private final RequestContextService requestContextService;
+    private final TokenCookieService tokenCookieService;
 
-    public JwtRequestFilter(JwtTokenHelper jwtTokenHelper, RequestContextService requestContextService) {
+    public JwtRequestFilter(JwtTokenHelper jwtTokenHelper, RequestContextService requestContextService, TokenCookieService tokenCookieService) {
         this.jwtTokenHelper = jwtTokenHelper;
         this.requestContextService = requestContextService;
+        this.tokenCookieService = tokenCookieService;
+    }
+
+    private String tryExtractTokenFromHeader(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring("Bearer ".length());
+        }
+        return null;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        String authHeader = request.getHeader("Authorization");
         String username = null;
-        String jwt = null;
+        String jwt = tryExtractTokenFromHeader(request);
         Long userId = null;
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            jwt = authHeader.substring("Bearer ".length());
+        if (jwt == null) {
+            jwt = tokenCookieService.getTokenFromCookie(request, "ACCESS_TOKEN");
+        }
+
+        if (jwt != null) {
             try {
                 username = jwtTokenHelper.getUserNameFromAccessToken(jwt);
                 userId = jwtTokenHelper.getUserIdFromAccessToken(jwt);

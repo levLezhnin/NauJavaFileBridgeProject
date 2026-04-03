@@ -1,12 +1,3 @@
-const globalSetTokens = typeof window !== 'undefined' && typeof window.setTokens === 'function'
-  ? window.setTokens
-  : (accessToken, refreshToken) => {
-      localStorage.setItem('naujava_access_token', accessToken);
-      if (refreshToken) {
-        localStorage.setItem('naujava_refresh_token', refreshToken);
-      }
-    };
-
 const globalShowAlert = typeof window !== 'undefined' && typeof window.showAlert === 'function'
   ? window.showAlert
   : (message, type = 'info') => {
@@ -29,17 +20,17 @@ function prepareAuthForm(formId, url) {
     const payload = {};
     formData.forEach((value, key) => (payload[key] = value));
     try {
+      const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers,
+        credentials: 'same-origin',
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
         const error = await response.json().catch(() => null);
         throw new Error(error?.message || 'Ошибка сервера');
       }
-      const result = await response.json();
-      globalSetTokens(result.accessToken, result.refreshToken);
       window.location.href = '/files';
     } catch (error) {
       globalShowAlert(error.message || 'Не удалось выполнить запрос', 'error');

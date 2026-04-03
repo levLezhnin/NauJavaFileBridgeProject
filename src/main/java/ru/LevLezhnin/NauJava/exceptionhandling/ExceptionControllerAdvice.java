@@ -19,38 +19,31 @@ public class ExceptionControllerAdvice {
 
     @ExceptionHandler(value = Throwable.class)
     public ResponseEntity<ErrorResponse> exceptionHandler(Throwable e, HttpServletRequest httpServletRequest) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new ErrorResponse(
-                        LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                        "Внутренняя ошибка сервера",
-                        e.getMessage(),
-                        httpServletRequest.getRequestURI()));
+        return buildResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Внутренняя ошибка сервера",
+                "Произошла непредвиденная ошибка. Пожалуйста, повторите запрос позже",
+                httpServletRequest
+        );
     }
 
     @ExceptionHandler(value = IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> illegalArgumentExceptionHandler(IllegalArgumentException e, HttpServletRequest httpServletRequest) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new ErrorResponse(
-                        LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Неправильно составлен запрос",
-                        e.getMessage(),
-                        httpServletRequest.getRequestURI()));
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Некорректный запрос",
+                "Параметры запроса указаны неверно. Проверьте введённые данные.",
+                httpServletRequest);
     }
 
     @ExceptionHandler(value = EntityNotFoundException.class)
     public ResponseEntity<ErrorResponse> entityNotFoundExceptionHandler(EntityNotFoundException e, HttpServletRequest httpServletRequest) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new ErrorResponse(
-                        LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                        HttpStatus.NOT_FOUND.value(),
-                        "Не найдено",
-                        e.getMessage(),
-                        httpServletRequest.getRequestURI()));
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                "Сущность не найден",
+                e.getMessage(),
+                httpServletRequest
+        );
     }
 
     @ExceptionHandler(value = NoResourceFoundException.class)
@@ -62,25 +55,31 @@ public class ExceptionControllerAdvice {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new ErrorResponse(
-                        LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                        HttpStatus.NOT_FOUND.value(),
-                        "Не найден ресурс",
-                        e.getMessage(),
-                        request.getRequestURI()));
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                "Ресурс не найден",
+                "Запрашиваемый ресурс не найден или не существует",
+                request);
     }
 
     @ExceptionHandler(value = BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> badCredentialsExceptionHandler(BadCredentialsException e, HttpServletRequest httpServletRequest) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        return buildResponse(
+                HttpStatus.UNAUTHORIZED,
+                "Ошибка аутентификации",
+                "Неверный логин или пароль",
+                httpServletRequest);
+    }
+
+    private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String error, String message, HttpServletRequest request) {
+        return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new ErrorResponse(
                         LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Неправильные данные аутентификации",
-                        e.getMessage(),
-                        httpServletRequest.getRequestURI()));
+                        status.value(),
+                        error,
+                        message,
+                        request.getRequestURI()
+                ));
     }
 }

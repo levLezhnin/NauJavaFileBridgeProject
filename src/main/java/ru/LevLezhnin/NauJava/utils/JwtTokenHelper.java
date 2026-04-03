@@ -3,15 +3,14 @@ package ru.LevLezhnin.NauJava.utils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import ru.LevLezhnin.NauJava.security.AppUserDetails;
+import ru.LevLezhnin.NauJava.security.JwtProperties;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -21,24 +20,19 @@ import java.util.stream.Collectors;
 @Component
 public class JwtTokenHelper {
 
-    @Value("${jwt.accessSecret}")
-    private String accessSecret;
-    @Value("${jwt.refreshSecret}")
-    private String refreshSecret;
+    private final JwtProperties jwtProperties;
 
-    @Value("${jwt.accessTokenLifetime}")
-    private Duration accessJwtLifetime;
-
-    @Value("${jwt.refreshTokenLifetime}")
-    private Duration refreshJwtLifetime;
+    public JwtTokenHelper(JwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
+    }
 
     private SecretKey getAccessSignKey() {
-        byte[] keyBytes = accessSecret.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = jwtProperties.getAccessSecret().getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
     private SecretKey getRefreshSignKey() {
-        byte[] keyBytes = refreshSecret.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = jwtProperties.getRefreshSecret().getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -55,7 +49,7 @@ public class JwtTokenHelper {
         }
 
         Date issuedDate = new Date();
-        Date expiredDate = new Date(issuedDate.getTime() + accessJwtLifetime.toMillis());
+        Date expiredDate = new Date(issuedDate.getTime() + jwtProperties.getAccessTokenLifetime().toMillis());
         return Jwts.builder()
                 .claims(payload)
                 .claim("type", "access")
@@ -68,7 +62,7 @@ public class JwtTokenHelper {
 
     public String generateRefreshToken(UserDetails userDetails) {
         Date issuedDate = new Date();
-        Date expiredDate = new Date(issuedDate.getTime() + refreshJwtLifetime.toMillis());
+        Date expiredDate = new Date(issuedDate.getTime() + jwtProperties.getRefreshTokenLifetime().toMillis());
 
         return Jwts.builder()
                 .claim("type", "refresh")

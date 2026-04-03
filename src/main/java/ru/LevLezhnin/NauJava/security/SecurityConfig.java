@@ -1,6 +1,7 @@
 package ru.LevLezhnin.NauJava.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,10 +47,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) {
         return httpSecurity
+
                 .csrf(AbstractHttpConfigurer::disable)
+
                 .authorizeHttpRequests(auth -> auth
                         // Статика и публичные страницы
-                        .requestMatchers("/", "/login", "/register", "/forbidden", "/files", "/upload", "/profile", "/download/**", "/users/list", "/css/**", "/js/**", "/assets/**").permitAll()
+                        .requestMatchers("/", "/login", "/register", "/forbidden", "/css/**", "/js/**", "/assets/**").permitAll()
 
                         // Actuator
                         .requestMatchers("/actuator/prometheus", "/actuator/health").permitAll()
@@ -69,11 +72,22 @@ public class SecurityConfig {
 
                         // Другое
                         .anyRequest().authenticated())
+
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(((request, response, authException) -> {
 
                             log.debug("Попытка неавторизованного доступа: {} {}", request.getMethod(), request.getRequestURI());
+
+                            if (isFrontendRequest(request)) {
+                                response.sendRedirect("/login");
+                                return;
+                            }
 
                             ObjectMapper objectMapper = new ObjectMapper();
 
@@ -93,6 +107,11 @@ public class SecurityConfig {
                                     auth != null ? auth.getAuthorities() : "Нет",
                                     request.getRequestURI());
 
+                            if (isFrontendRequest(request)) {
+                                response.sendRedirect("/forbidden");
+                                return;
+                            }
+
                             ObjectMapper objectMapper = new ObjectMapper();
 
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -103,8 +122,14 @@ public class SecurityConfig {
                                     "path", request.getRequestURI()
                             ));
                         })))
+
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    private boolean isFrontendRequest(HttpServletRequest request) {
+        String accept = request.getHeader("Accept");
+        return accept != null && accept.contains("text/html");
     }
 
     @Bean

@@ -56,7 +56,7 @@ public class AuthServiceImpl implements AuthService {
     public JwtResponseDto refresh(JwtRefreshRequestDto jwtRefreshRequestDto) {
         String refreshToken = jwtRefreshRequestDto.refreshToken();
 
-        if (!jwtTokenHelper.isRefreshToken(refreshToken)) {
+        if (refreshToken == null || !jwtTokenHelper.isRefreshToken(refreshToken)) {
             throw new IllegalArgumentException("Невалидный refresh token");
         }
 

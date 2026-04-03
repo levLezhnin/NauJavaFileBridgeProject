@@ -1,27 +1,4 @@
-const StorageKeys = {
-  accessToken: 'naujava_access_token',
-  refreshToken: 'naujava_refresh_token'
-};
-
-function getAccessToken() {
-  return localStorage.getItem(StorageKeys.accessToken);
-}
-
-function getRefreshToken() {
-  return localStorage.getItem(StorageKeys.refreshToken);
-}
-
-function setTokens(accessToken, refreshToken) {
-  localStorage.setItem(StorageKeys.accessToken, accessToken);
-  if (refreshToken) {
-    localStorage.setItem(StorageKeys.refreshToken, refreshToken);
-  }
-}
-
-function clearTokens() {
-  localStorage.removeItem(StorageKeys.accessToken);
-  localStorage.removeItem(StorageKeys.refreshToken);
-}
+const publicPaths = ['/', '/login', '/register', '/forbidden'];
 
 function showAlert(message, type = 'info') {
   const container = document.querySelector('#alertContainer');
@@ -37,18 +14,14 @@ function showAlert(message, type = 'info') {
 }
 
 function apiFetch(path, options = {}) {
-  const token = getAccessToken();
   options.headers = options.headers || {};
   options.headers['Accept'] = 'application/json';
   if (!(options.body instanceof FormData)) {
     options.headers['Content-Type'] = 'application/json';
   }
-  if (token) {
-    options.headers['Authorization'] = `Bearer ${token}`;
-  }
+  options.credentials = options.credentials || 'same-origin';
   return fetch(path, options).then(async response => {
     if (response.status === 401) {
-      clearTokens();
       window.location.href = '/login';
       return Promise.reject(new Error('Unauthorized'));
     }
@@ -60,44 +33,70 @@ function apiFetch(path, options = {}) {
   });
 }
 
-function decodeJwt(token) {
-  if (!token) return null;
-  const payload = token.split('.')[1];
-  if (!payload) return null;
-  try {
-    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(decodeURIComponent(escape(decoded)));
-  } catch (error) {
-    return null;
-  }
+function updateNavbar(isAuthenticated) {
+  const authLinks = document.querySelectorAll('.auth-only');
+  const guestLinks = document.querySelectorAll('.guest-only');
+  authLinks.forEach(el => el.style.display = isAuthenticated ? 'inline-flex' : 'none');
+  guestLinks.forEach(el => el.style.display = isAuthenticated ? 'none' : 'inline-flex');
+}
+
+function isPublicPage() {
+  return publicPaths.includes(window.location.pathname);
+}
+
+function checkAuthStatus() {
+  return fetch('/api/v1/users/me', {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' },
+    credentials: 'same-origin'
+  }).then(response => response.ok).catch(() => false);
 }
 
 function initNavbar() {
-  const token = getAccessToken();
-  const authLinks = document.querySelectorAll('.auth-only');
-  const guestLinks = document.querySelectorAll('.guest-only');
-  authLinks.forEach(el => el.style.display = token ? 'inline-flex' : 'none');
-  guestLinks.forEach(el => el.style.display = token ? 'none' : 'inline-flex');
+  updateNavbar(false);
   const logout = document.querySelector('#logoutButton');
   if (logout) {
-    logout.addEventListener('click', () => {
-      clearTokens();
+    logout.addEventListener('click', async () => {
+      try {
+        await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+      } catch (error) {
+        // ignore network/logout errors
+      }
       window.location.href = '/login';
     });
   }
+
+  checkAuthStatus().then(isAuthenticated => {
+    updateNavbar(isAuthenticated);
+    if (!isAuthenticated && !isPublicPage()) {
+      window.location.href = '/login';
+    }
+  });
 }
 
 function initProfileData() {
-  const token = getAccessToken();
-  const payload = decodeJwt(token);
   const usernameNode = document.querySelector('#profileUsername');
   const quotaNode = document.querySelector('#profileQuota');
-  if (usernameNode) {
-    usernameNode.textContent = payload?.username || payload?.sub || 'Неизвестный пользователь';
+  if (!usernameNode && !quotaNode) {
+    return;
   }
-  if (quotaNode) {
-    quotaNode.textContent = 'Квотные данные будут доступны после подключения серверного API.';
-  }
+  apiFetch('/api/v1/users/me', { method: 'GET' })
+    .then(data => {
+      if (usernameNode) {
+        usernameNode.textContent = data?.username || data?.email || 'Неизвестный пользователь';
+      }
+      if (quotaNode) {
+        quotaNode.textContent = data ? 'Квотные данные загружены.' : 'Нет информации о квоте.';
+      }
+    })
+    .catch(() => {
+      if (usernameNode) {
+        usernameNode.textContent = 'Гость';
+      }
+      if (quotaNode) {
+        quotaNode.textContent = 'Нет информации о квоте.';
+      }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -106,11 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.showAlert = showAlert;
-window.setTokens = setTokens;
-window.getAccessToken = getAccessToken;
-window.getRefreshToken = getRefreshToken;
-window.clearTokens = clearTokens;
 window.apiFetch = apiFetch;
-window.decodeJwt = decodeJwt;
 window.initNavbar = initNavbar;
 window.initProfileData = initProfileData;
