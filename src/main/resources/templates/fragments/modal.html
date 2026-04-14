@@ -1,0 +1,15 @@
+<div th:fragment="modal">
+    <div class="modal-backdrop" id="modalBackdrop" hidden>
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-header">
+                <h2 id="modalTitle">Подтвердите действие</h2>
+                <button id="modalClose" type="button" class="modal-close" aria-label="Закрыть">×</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button id="modalCancel" class="btn btn-secondary" type="button">Отмена</button>
+                <button id="modalConfirm" class="btn btn-primary" type="button">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+</div>

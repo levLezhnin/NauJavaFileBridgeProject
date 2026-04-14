@@ -22,6 +22,7 @@ public abstract class AbstractStorageQuotaService implements StorageQuotaService
         }
 
         return StorageQuota.builder()
-                .setMaxStorageBytes(quotaTariff.getMaxStorageSize().toBytes());
+                .setMaxStorageBytes(quotaTariff.getMaxStorageSize().toBytes())
+                .setUsedStorageBytes(0L);
     }
 }

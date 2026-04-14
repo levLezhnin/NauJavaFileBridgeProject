@@ -34,6 +34,18 @@ app:
   version: 1.0
 
   quotas:
-    BASIC:
-      max-storage-size: 1GB
-      max-file-size: 100MB
+    tariffs:
+      BASIC:
+        maxStorageSize: 1GB
+        maxFileSize: 100MB
+
+jwt:
+  accessSecret: ${ACCESS_JWT_SECRET}
+  refreshSecret: ${REFRESH_JWT_SECRET}
+  accessTokenLifetime: 30m
+  refreshTokenLifetime: 1d
+
+cookie:
+  path: /
+  sameSite: Lax
+  secure: false

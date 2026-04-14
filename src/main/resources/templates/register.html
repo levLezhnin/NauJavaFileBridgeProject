@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Регистрация | File Bridge</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+<main class="page-shell auth-shell">
+    <section class="auth-panel">
+        <div class="auth-header">
+            <p class="eyebrow">Регистрация</p>
+            <h1>Создать новый аккаунт</h1>
+            <p>Заполните форму, чтобы начать хранить и обмениваться файлами.</p>
+        </div>
+        <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <form id="registerForm" class="form-card" novalidate>
+            <div class="form-group">
+                <label for="registerUsername">Имя пользователя</label>
+                <input id="registerUsername" name="username" type="text" required autocomplete="username" />
+            </div>
+            <div class="form-group">
+                <label for="registerEmail">Email</label>
+                <input id="registerEmail" name="email" type="email" required autocomplete="email" />
+            </div>
+            <div class="form-group">
+                <label for="registerPassword">Пароль</label>
+                <input id="registerPassword" name="password" type="password" required autocomplete="new-password" />
+            </div>
+            <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+            <p class="form-note">Уже есть аккаунт? <a th:href="@{/login}">Войти</a></p>
+        </form>
+    </section>
+</main>
+<script th:src="@{/js/app.js}"></script>
+<script th:src="@{/js/auth.js}"></script>
+</body>
+</html>

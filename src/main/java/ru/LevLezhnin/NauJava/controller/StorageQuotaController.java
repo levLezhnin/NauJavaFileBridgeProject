@@ -11,7 +11,7 @@ import ru.LevLezhnin.NauJava.repository.jpa.StorageQuotaRepository;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/v1/storage-quotas")
+@RequestMapping("/api/v1/quotas")
 public class StorageQuotaController {
 
     private final StorageQuotaRepository storageQuotaRepository;

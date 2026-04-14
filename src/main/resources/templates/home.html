@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>File Bridge — Домашняя</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+<main class="page-shell page-home">
+    <section class="hero-card">
+        <div>
+            <p class="eyebrow">File Bridge</p>
+            <h1>Обмениваться файлами стало проще</h1>
+            <p class="hero-text">Защищённый обмен, понятный интерфейс и быстрый доступ к личным файлам.</p>
+            <div class="hero-actions">
+                <a th:href="@{/register}" class="btn btn-primary">Начать</a>
+                <a th:href="@{/login}" class="btn btn-secondary">Уже есть аккаунт</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="card-visual">
+                <span class="badge">Ваш дашборд</span>
+                <div class="preview-grid">
+                    <div class="preview-heading">Последние файлы</div>
+                    <div class="preview-info">
+                        <span class="pill pill-success">Активен</span>
+                        <span class="pill pill-muted">до 4 дней</span>
+                    </div>
+                    <div class="preview-metrics">
+                        <div class="metric">
+                            <span>Файлы</span>
+                            <strong>8</strong>
+                        </div>
+                        <div class="metric">
+                            <span>Загрузки</span>
+                            <strong>26</strong>
+                        </div>
+                    </div>
+                    <div class="preview-actions">
+                        <span class="preview-action">Загрузить</span>
+                        <span class="preview-action">Скачать</span>
+                    </div>
+                </div>
+                <p class="visual-caption">Статус файлов, квота и быстрые действия в одном месте.</p>
+            </div>
+        </div>
+    </section>
+    <section class="feature-grid">
+        <article class="feature-card">
+            <h2>📊 Интуитивный дашборд</h2>
+            <p>Все файлы, квота и управление загрузками в одном месте.</p>
+        </article>
+        <article class="feature-card">
+            <h2>🔒 Безопасный доступ</h2>
+            <p>JWT-аутентификация и чёткая обработка ошибок.</p>
+        </article>
+        <article class="feature-card">
+            <h2>🚀 Быстрый старт</h2>
+            <p>Простая форма с минимальными полями для быстрого входа.</p>
+        </article>
+    </section>
+</main>
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>
