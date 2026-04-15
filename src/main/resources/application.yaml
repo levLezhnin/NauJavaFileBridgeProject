@@ -27,7 +27,12 @@ minio:
   url: http://${MINIO_HOST}:${MINIO_PORT}
   accessKey: ${MINIO_ACCESS_KEY}
   secretKey: ${MINIO_SECRET_KEY}
-  bucket: ${MINIO_BUCKET}
+
+  buckets:
+    fileBucket:
+      name: ${MINIO_FILE_BUCKET}
+    reportBucket:
+      name: ${MINIO_REPORT_BUCKET}
 
 app:
   name: File Bridge

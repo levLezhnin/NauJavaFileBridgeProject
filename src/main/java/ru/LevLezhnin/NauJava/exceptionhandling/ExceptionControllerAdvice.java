@@ -1,6 +1,8 @@
 package ru.LevLezhnin.NauJava.exceptionhandling;
 
-import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -8,11 +10,10 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import jakarta.servlet.http.HttpServletRequest;
 import ru.LevLezhnin.NauJava.dto.ErrorResponse;
 import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
-
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 @ControllerAdvice
 public class ExceptionControllerAdvice {
@@ -68,6 +69,15 @@ public class ExceptionControllerAdvice {
                 HttpStatus.UNAUTHORIZED,
                 "Ошибка аутентификации",
                 "Неверный логин или пароль",
+                httpServletRequest);
+    }
+
+    @ExceptionHandler(value = IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> illegalStateExceptionHandler(IllegalStateException e, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Некорректное состояние",
+                e.getMessage(),
                 httpServletRequest);
     }
 

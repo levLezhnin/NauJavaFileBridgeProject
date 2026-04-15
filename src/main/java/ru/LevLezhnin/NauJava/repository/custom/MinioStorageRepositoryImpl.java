@@ -4,25 +4,21 @@ import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Repository;
 import ru.LevLezhnin.NauJava.exceptions.FileStorageException;
-import ru.LevLezhnin.NauJava.properties.MinioProperties;
 
 import java.io.IOException;
 import java.io.InputStream;
 
-@Repository
-public class MinioFileStorageRepositoryImpl implements FileStorageRepository {
+public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
+
+    private static final Logger logger = LoggerFactory.getLogger(MinioStorageRepositoryImpl.class);
 
     private final MinioClient minioClient;
-    private final MinioProperties minioProperties;
-    private static final Logger logger = LoggerFactory.getLogger(MinioFileStorageRepositoryImpl.class);
+    private final String bucketName;
 
-    @Autowired
-    public MinioFileStorageRepositoryImpl(MinioClient minioClient, MinioProperties minioProperties) {
+    public MinioStorageRepositoryImpl(MinioClient minioClient, String bucketName) {
         this.minioClient = minioClient;
-        this.minioProperties = minioProperties;
+        this.bucketName = bucketName;
     }
 
     @Override
@@ -34,7 +30,7 @@ public class MinioFileStorageRepositoryImpl implements FileStorageRepository {
             logger.debug("Загрузка файла в Minio: {}. Размер: {}. Content-Type: {}", path, size, contentType);
             minioClient.putObject(
                     PutObjectArgs.builder()
-                            .bucket(minioProperties.getBucket())
+                            .bucket(bucketName)
                             .object(path)
                             .stream(inputStream, size, -1)
                             .contentType(contentType)
@@ -61,7 +57,7 @@ public class MinioFileStorageRepositoryImpl implements FileStorageRepository {
             logger.debug("Скачивание файла из хранилиза: {}", path);
             return minioClient.getObject(
                     GetObjectArgs.builder()
-                            .bucket(minioProperties.getBucket())
+                            .bucket(bucketName)
                             .object(path)
                             .build()
             );
@@ -80,7 +76,7 @@ public class MinioFileStorageRepositoryImpl implements FileStorageRepository {
         try {
             minioClient.statObject(
                     StatObjectArgs.builder()
-                            .bucket(minioProperties.getBucket())
+                            .bucket(bucketName)
                             .object(path)
                             .build()
             );
@@ -99,7 +95,7 @@ public class MinioFileStorageRepositoryImpl implements FileStorageRepository {
         try {
             StatObjectResponse response = minioClient.statObject(
                     StatObjectArgs.builder()
-                            .bucket(minioProperties.getBucket())
+                            .bucket(bucketName)
                             .object(path)
                             .build()
             );
@@ -119,7 +115,7 @@ public class MinioFileStorageRepositoryImpl implements FileStorageRepository {
         try {
             minioClient.removeObject(
                     RemoveObjectArgs.builder()
-                            .bucket(minioProperties.getBucket())
+                            .bucket(bucketName)
                             .object(path)
                             .build()
             );

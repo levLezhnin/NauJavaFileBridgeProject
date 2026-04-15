@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Отчёт | File Bridge</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+<main class="page-shell dashboard-shell" id="reportShell" th:data-report-id="${reportId}">
+    <section class="dashboard-header">
+        <div>
+            <p class="eyebrow">Отчёт</p>
+            <h1>Пользовательский отчёт</h1>
+            <p class="hero-text">Сформируйте актуальный отчёт с информацией о регистрациях и статусах.</p>
+        </div>
+        <button id="generateReportButton" type="button" class="btn btn-primary">Сформировать отчёт</button>
+    </section>
+    <div th:replace="~{fragments/alerts :: alerts}"></div>
+    <section class="table-card report-card">
+        <div class="report-status">
+            <p class="report-status-label">Статус</p>
+            <p id="reportStatusText">Нажмите «Сформировать отчёт» для начала.</p>
+        </div>
+        <div id="reportActions" class="report-actions"></div>
+        <div id="reportContent" class="report-viewer">
+            <div class="empty-state">
+                <p class="empty-title">Пока нет отчёта</p>
+                <p class="empty-text">После запуска отчёта его результаты появятся здесь.</p>
+            </div>
+        </div>
+    </section>
+</main>
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>

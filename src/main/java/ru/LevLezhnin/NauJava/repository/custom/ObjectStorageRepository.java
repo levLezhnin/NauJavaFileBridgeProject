@@ -2,7 +2,7 @@ package ru.LevLezhnin.NauJava.repository.custom;
 
 import java.io.InputStream;
 
-public interface FileStorageRepository {
+public interface ObjectStorageRepository {
 
     /**
      * Загружает файл по пути

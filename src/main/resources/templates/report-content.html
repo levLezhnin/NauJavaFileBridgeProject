@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Отчёт о пользователях | File Bridge</title>
+</head>
+<body>
+    <h1 style="margin-top: 0;">📊 Статистический отчёт</h1>
+    <p style="color: #6b7280; margin-bottom: 2rem;">Отчёт о зарегистрированных пользователях системы File Bridge</p>
+
+    <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 24px; box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08); padding: 1.75rem; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.3rem; margin-top: 0; margin-bottom: 1rem; color: #1f2937;">👥 Зарегистрированные пользователи</h2>
+        <div style="color: #6b7280; margin: 0.75rem 0; font-size: 0.95rem;">
+            Количество пользователей: <span style="color: #3b82f6; font-weight: 700; font-size: 1.2rem;" th:text="${usersCount}">0</span>
+        </div>
+        <div style="color: #6b7280; margin: 0.75rem 0; font-size: 0.95rem;">
+            Время подсчёта: <span style="color: #3b82f6; font-weight: 700; font-size: 1.2rem;" th:text="${timeElapsedCountingUsersMillis} + ' мс'">0 мс</span>
+        </div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 24px; box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08); padding: 1.75rem; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.3rem; margin-top: 0; margin-bottom: 1rem; color: #1f2937;">📦 Список пользователей</h2>
+        <div th:if="${users != null and !users.isEmpty()}">
+            <div style="overflow-x: auto; margin: 1rem 0;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                    <thead>
+                        <tr>
+                            <th style="background: #f8fafc; color: #6b7280; padding: 1rem; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">ID</th>
+                            <th style="background: #f8fafc; color: #6b7280; padding: 1rem; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Имя</th>
+                            <th style="background: #f8fafc; color: #6b7280; padding: 1rem; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Email</th>
+                            <th style="background: #f8fafc; color: #6b7280; padding: 1rem; text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Роль</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="user : ${users}" style="transition: background-color 0.2s ease;">
+                            <td style="padding: 0.85rem 1rem; border-bottom: 1px solid #e5e7eb; color: #1f2937;" th:text="${user.id}">1</td>
+                            <td style="padding: 0.85rem 1rem; border-bottom: 1px solid #e5e7eb; color: #1f2937;" th:text="${user.username}">username</td>
+                            <td style="padding: 0.85rem 1rem; border-bottom: 1px solid #e5e7eb; color: #1f2937;" th:text="${user.email}">email@example.com</td>
+                            <td style="padding: 0.85rem 1rem; border-bottom: 1px solid #e5e7eb; color: #1f2937;" th:text="${user.role}">ADMIN</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="color: #6b7280; margin: 0.75rem 0; font-size: 0.95rem;">
+                Время сбора данных: <span style="color: #3b82f6; font-weight: 700; font-size: 1.2rem;" th:text="${timeElapsedCollectingUsersMillis} + ' мс'">0 мс</span>
+            </div>
+        </div>
+        <div th:if="${users == null or users.isEmpty()}" style="padding: 2rem; border: 1px dashed #e5e7eb; border-radius: 20px; text-align: center; color: #6b7280;">
+            <p>Нет зарегистрированных пользователей</p>
+        </div>
+    </div>
+
+    <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 0.9rem; text-align: center;">
+        <p>⏳ Общее время формирования отчёта: <span style="color: #3b82f6; font-weight: 700;" th:text="${totalTime} + ' мс'">0 мс</span></p>
+    </div>
+</body>
+</html>

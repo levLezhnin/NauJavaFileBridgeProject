@@ -367,6 +367,80 @@ button {
   border-radius: 20px;
   background: var(--surface-strong);
 }
+.report-card {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: 1.75rem;
+}
+.report-status {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.report-status-label {
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.8rem;
+}
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.report-actions .pill {
+  margin: 0;
+}
+.report-viewer {
+  padding: 2rem 1.25rem;
+  border-radius: 20px;
+  background: var(--surface);
+  overflow: auto;
+  font-family: Inter, system-ui, sans-serif;
+  margin: 1.5rem 0 0 0;
+  width: 100%;
+}
+.report-viewer > div {
+  margin: 0;
+}
+.report-viewer h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text);
+}
+.report-viewer h2 {
+  font-size: 1.3rem;
+  margin: 1.75rem 0 1rem 0;
+  color: var(--text);
+}
+.report-viewer div {
+  margin: 0;
+  color: var(--text);
+}
+.report-viewer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+.report-viewer th,
+.report-viewer td {
+  padding: 0.85rem;
+  text-align: left;
+  border: 1px solid var(--border);
+}
+.report-viewer th {
+  background: #f8fafc;
+  color: var(--muted);
+  font-weight: 600;
+}
+.report-viewer tbody tr:hover {
+  background: #f8fafc;
+}
 .alert-area {
   display: grid;
   gap: 0.75rem;

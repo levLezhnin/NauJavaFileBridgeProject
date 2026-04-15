@@ -9,7 +9,8 @@
             <a th:href="@{/files}" class="nav-link auth-only">Файлы</a>
             <a th:href="@{/upload}" class="nav-link auth-only">Загрузить</a>
             <a th:href="@{/profile}" class="nav-link auth-only">Профиль</a>
-            <a th:href="@{/users/list}" class="nav-link auth-only">Пользователи</a>
+            <a th:href="@{/users/list}" class="nav-link auth-only admin-only">Пользователи</a>
+            <a th:href="@{/report}" class="nav-link auth-only admin-only">Отчёт</a>
             <a th:href="@{/login}" class="nav-link guest-only">Войти</a>
             <a th:href="@{/register}" class="nav-link guest-only">Регистрация</a>
             <button id="logoutButton" type="button" class="btn btn-secondary auth-only">Выйти</button>

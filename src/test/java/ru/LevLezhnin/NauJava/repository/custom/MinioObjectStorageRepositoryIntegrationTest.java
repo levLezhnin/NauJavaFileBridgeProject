@@ -1,12 +1,13 @@
 package ru.LevLezhnin.NauJava.repository.custom;
 
-import io.minio.*;
+import io.minio.BucketExistsArgs;
+import io.minio.MakeBucketArgs;
+import io.minio.MinioClient;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import ru.LevLezhnin.NauJava.properties.MinioProperties;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -14,7 +15,7 @@ import java.io.InputStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
-class MinioFileStorageRepositoryIntegrationTest {
+class MinioObjectStorageRepositoryIntegrationTest {
 
     private static final String ACCESS_KEY = "minioadmin";
     private static final String SECRET_KEY = "minioadmin";
@@ -33,7 +34,7 @@ class MinioFileStorageRepositoryIntegrationTest {
                                     .forPort(9000)
                     );
 
-    static MinioFileStorageRepositoryImpl repository;
+    static MinioStorageRepositoryImpl repository;
 
     @BeforeAll
     static void setup() throws Exception {
@@ -55,10 +56,9 @@ class MinioFileStorageRepositoryIntegrationTest {
             );
         }
 
-        MinioProperties props = new MinioProperties();
-        props.setBucket(BUCKET);
-
-        repository = new MinioFileStorageRepositoryImpl(client, props);
+        repository = new MinioStorageRepositoryImpl(
+                client,
+                BUCKET);
     }
 
     @Test
