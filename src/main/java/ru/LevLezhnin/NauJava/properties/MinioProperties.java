@@ -3,13 +3,16 @@ package ru.LevLezhnin.NauJava.properties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Collections;
+import java.util.Map;
+
 @Configuration
 @ConfigurationProperties(prefix = "minio")
 public class MinioProperties {
     private String url;
     private String accessKey;
     private String secretKey;
-    private String bucket;
+    private Map<String, BucketProperties> buckets;
 
     public String getUrl() {
         return url;
@@ -35,11 +38,38 @@ public class MinioProperties {
         this.secretKey = secretKey;
     }
 
-    public String getBucket() {
-        return bucket;
+    public Map<String, BucketProperties> getBuckets() {
+        return Collections.unmodifiableMap(buckets);
     }
 
-    public void setBucket(String bucket) {
-        this.bucket = bucket;
+    public void setBuckets(Map<String, BucketProperties> buckets) {
+        this.buckets = buckets;
+    }
+
+    public static class BucketProperties {
+        private String name;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+    }
+
+    public enum BucketKeys {
+        FILE_BUCKET("fileBucket"),
+        REPORT_BUCKET("reportBucket");
+
+        private final String key;
+
+        public String getKey() {
+            return key;
+        }
+
+        BucketKeys(String key) {
+            this.key = key;
+        }
     }
 }

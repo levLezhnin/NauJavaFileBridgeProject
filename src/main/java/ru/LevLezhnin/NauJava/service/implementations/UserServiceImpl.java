@@ -1,5 +1,9 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -7,20 +11,22 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
 import ru.LevLezhnin.NauJava.dto.user.UpdateUserRequestDto;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
 import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
-import ru.LevLezhnin.NauJava.model.*;
+import ru.LevLezhnin.NauJava.model.File;
+import ru.LevLezhnin.NauJava.model.QuotaTariffs;
+import ru.LevLezhnin.NauJava.model.StorageQuota;
+import ru.LevLezhnin.NauJava.model.User;
+import ru.LevLezhnin.NauJava.model.UserBan;
+import ru.LevLezhnin.NauJava.model.UserRole;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
 import ru.LevLezhnin.NauJava.repository.user.search.UserSearchStrategy;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
 import ru.LevLezhnin.NauJava.service.interfaces.UserService;
 import ru.LevLezhnin.NauJava.utils.RequestContextService;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -105,7 +111,12 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserProfileResponseDto getProfile() {
         User user = getUserByAuthentication();
-        return new UserProfileResponseDto(user.getUsername(), user.getEmail(), user.getRegisteredAt());
+        return new UserProfileResponseDto(
+                user.getUsername(),
+                user.getEmail(),
+                user.getRegisteredAt(),
+                user.getRole() != null ? user.getRole().name() : null
+        );
     }
 
     @Override

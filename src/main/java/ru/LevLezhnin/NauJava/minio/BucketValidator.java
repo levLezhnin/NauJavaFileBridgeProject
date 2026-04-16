@@ -29,14 +29,18 @@ public class BucketValidator {
 
     @EventListener(ApplicationReadyEvent.class)
     public void validateBucket() {
+        minioProperties.getBuckets().forEach(this::checkBucketCreated);
+    }
+
+    private void checkBucketCreated(String bucketKey, MinioProperties.BucketProperties bucketProperties) {
         try {
-            boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(minioProperties.getBucket()).build());
+            boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketProperties.getName()).build());
 
             if (!exists) {
-                log.error("Бакет {} не найден. Создайте бакет в файловом хранилище перед запуском приложения", minioProperties.getBucket());
-                throw new FileStorageException("Бакет не найден: " + minioProperties.getBucket(), null);
+                log.error("Бакет {} не найден. Создайте бакет в файловом хранилище перед запуском приложения", bucketProperties.getName());
+                throw new FileStorageException("Бакет не найден: " + bucketProperties.getName(), null);
             } else {
-                log.info("Бакет {} существует.", minioProperties.getBucket());
+                log.info("Бакет {} существует.", bucketProperties.getName());
             }
 
         } catch (Exception e) {

@@ -54,13 +54,15 @@ services:
     entrypoint: >
       /bin/sh -c "
       echo 'Configuring MinIO...';
-      echo 'Creating bucket:' ${MINIO_BUCKET};
-
       mc alias set file-storage http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
-
-      mc mb file-storage/${MINIO_BUCKET} && echo 'Created' || echo 'Already exists';
-
-      mc anonymous set none file-storage/${MINIO_BUCKET};
+      
+      echo 'Creating bucket:' ${MINIO_FILE_BUCKET};
+      mc mb file-storage/${MINIO_FILE_BUCKET} && echo 'Created' || echo 'Already exists';
+      mc anonymous set none file-storage/${MINIO_FILE_BUCKET};
+      
+      echo 'Creating bucket:' ${MINIO_REPORT_BUCKET};
+      mc mb file-storage/${MINIO_REPORT_BUCKET} && echo 'Created' || echo 'Already exists';
+      mc anonymous set none file-storage/${MINIO_REPORT_BUCKET};
 
       mc ls file-storage;
 

@@ -54,12 +54,15 @@ public class SecurityConfig {
                         // Статика и публичные страницы
                         .requestMatchers("/", "/login", "/register", "/forbidden", "/css/**", "/js/**", "/assets/**").permitAll()
 
+                        // Админские страницы
+                        .requestMatchers("/admin/**").hasRole(UserRole.ADMIN.name())
+
                         // Actuator
                         .requestMatchers("/actuator/prometheus", "/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").hasRole(UserRole.ADMIN.name())
 
                         // Swagger
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/admin/**").hasRole(UserRole.ADMIN.name())
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").hasRole(UserRole.ADMIN.name())
 
                         // Auth
                         .requestMatchers("/api/v*/auth/**").permitAll()
