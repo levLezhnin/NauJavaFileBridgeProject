@@ -1,7 +1,5 @@
 package ru.LevLezhnin.NauJava.controller;
 
-import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -9,9 +7,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-
 import ru.LevLezhnin.NauJava.model.User;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
+
+import java.util.List;
 
 @Controller
 public class ViewController {
@@ -26,7 +25,7 @@ public class ViewController {
     @GetMapping("/")
     public String homeView() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && !auth.getPrincipal().equals("anonymousUser")) {
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
             return "redirect:/files";
         }
         return "home";
@@ -68,19 +67,19 @@ public class ViewController {
         return "download";
     }
 
-    @GetMapping("/users/list")
+    @GetMapping("/admin/users/list")
     public String userListView(Model model) {
         List<User> users = userRepository.findAll();
         model.addAttribute("users", users);
         return "userList";
     }
 
-    @GetMapping("/report")
+    @GetMapping("/admin/report")
     public String reportView() {
         return "report";
     }
 
-    @GetMapping("/report/{id}")
+    @GetMapping("/admin/report/{id}")
     public String reportViewById(@PathVariable("id") Long id, Model model) {
         model.addAttribute("reportId", id);
         return "report";

@@ -7,13 +7,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.model.Report;
 import ru.LevLezhnin.NauJava.model.ReportStatus;
 import ru.LevLezhnin.NauJava.model.User;
 import ru.LevLezhnin.NauJava.repository.custom.ObjectStorageRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.ReportRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
-import ru.LevLezhnin.NauJava.service.base.AbstractReportService;
+import ru.LevLezhnin.NauJava.service.interfaces.ReportService;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -28,21 +29,48 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-public class UserReportServiceImpl extends AbstractReportService {
+public class UserReportServiceImpl implements ReportService {
 
     private static final Logger log = LoggerFactory.getLogger(UserReportServiceImpl.class);
     private static final ExecutorService userReportServiceExecutor = Executors.newCachedThreadPool();
     private static final String REPORT_PATH_TEMPLATE = "/reports/%d";
 
+    private final ReportRepository reportRepository;
     private final UserRepository userRepository;
     private final ObjectStorageRepository reportStorageRepository;
     private final TemplateEngine templateEngine;
 
     public UserReportServiceImpl(ReportRepository reportRepository, ObjectStorageRepository reportStorageRepository, UserRepository userRepository, TemplateEngine templateEngine) {
-        super(reportRepository);
+        this.reportRepository = reportRepository;
         this.userRepository = userRepository;
         this.reportStorageRepository = reportStorageRepository;
         this.templateEngine = templateEngine;
+    }
+
+    @Override
+    public Long createReport() {
+        Report report = Report.builder()
+                .setReportStatus(ReportStatus.CREATED)
+                .setCreatedAt(Instant.now())
+                .build();
+        reportRepository.save(report);
+        return report.getId();
+    }
+
+    @Override
+    public String getReportContent(Long id) {
+        Report report = findById(id);
+
+        return switch (report.getReportStatus()) {
+            case FINISHED -> fetchContent(id);
+            case CREATED -> throw new IllegalStateException("Отчёт ещё создаётся");
+            case ERROR -> throw new IllegalStateException("Формирование отчёта завершилось с ошибкой: %s".formatted(report.getContent()));
+        };
+    }
+
+    private Report findById(Long id) {
+        return reportRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Отчёт с id: %d не найден".formatted(id)));
     }
 
     private ReportData getReportData() throws InterruptedException {
@@ -91,8 +119,7 @@ public class UserReportServiceImpl extends AbstractReportService {
         return new ReportData(usersCount.get(), usersList.get(), timeElapsedCountingUsers.get(), timeElapsedCollectingUsers.get());
     }
 
-    @Override
-    protected String fetchContent(Long id) {
+    private String fetchContent(Long id) {
         Report report = findById(id);
 
         try (InputStream reportStream = reportStorageRepository.downloadByPath(report.getContent())) {
@@ -140,9 +167,8 @@ public class UserReportServiceImpl extends AbstractReportService {
                 userReportServiceExecutor);
     }
 
-    @Override
     @Transactional
-    protected void updateReport(Long reportId, InputStream content, long size, ReportStatus status) {
+    private void updateReport(Long reportId, InputStream content, long size, ReportStatus status) {
         Report report = findById(reportId);
 
         String path = REPORT_PATH_TEMPLATE.formatted(reportId);
@@ -159,6 +185,12 @@ public class UserReportServiceImpl extends AbstractReportService {
         report.setGeneratedAt(Instant.now());
 
         reportRepository.save(report);
+    }
+
+    private void updateReportError(Long reportId, String errorMessage) {
+        byte[] errorMessageBytes = errorMessage.getBytes(StandardCharsets.UTF_8);
+        long size = errorMessageBytes.length;
+        updateReport(reportId, new ByteArrayInputStream(errorMessageBytes), size, ReportStatus.ERROR);
     }
 
     private record ReportData(long usersCount, List<User> userList, long timeElapsedCountingUsersMillis, long timeElapsedCollectingUsersMillis){}

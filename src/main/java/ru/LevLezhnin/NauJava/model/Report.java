@@ -31,10 +31,6 @@ public class Report {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public ReportStatus getReportStatus() {
         return reportStatus;
     }
@@ -53,10 +49,6 @@ public class Report {
 
     public Instant getCreatedAt() {
         return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
     }
 
     public Instant getGeneratedAt() {
@@ -99,7 +91,7 @@ public class Report {
         private ReportStatus reportStatus;
         private String content;
         private Instant createdAt;
-        private Instant updatedAt;
+        private Instant generatedAt;
 
         public Long getId() {
             return id;
@@ -137,17 +129,17 @@ public class Report {
             return this;
         }
 
-        public Instant getUpdatedAt() {
-            return updatedAt;
+        public Instant getGeneratedAt() {
+            return generatedAt;
         }
 
-        public Builder setUpdatedAt(Instant updatedAt) {
-            this.updatedAt = updatedAt;
+        public Builder setGeneratedAt(Instant generatedAt) {
+            this.generatedAt = generatedAt;
             return this;
         }
 
         public Report build() {
-            return new Report(id, reportStatus, content, createdAt, updatedAt);
+            return new Report(id, reportStatus, content, createdAt, generatedAt);
         }
     }
 }
