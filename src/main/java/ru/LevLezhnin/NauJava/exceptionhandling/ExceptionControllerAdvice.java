@@ -1,21 +1,21 @@
 package ru.LevLezhnin.NauJava.exceptionhandling;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
-import jakarta.servlet.http.HttpServletRequest;
 import ru.LevLezhnin.NauJava.dto.ErrorResponse;
 import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
 
-@ControllerAdvice
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+@RestControllerAdvice
 public class ExceptionControllerAdvice {
 
     @ExceptionHandler(value = Throwable.class)
@@ -25,6 +25,19 @@ public class ExceptionControllerAdvice {
                 "Внутренняя ошибка сервера",
                 "Произошла непредвиденная ошибка. Пожалуйста, повторите запрос позже",
                 httpServletRequest
+        );
+    }
+
+    @ExceptionHandler(value = HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> httpMessageNotReadableExceptionHandler(
+            HttpMessageNotReadableException e,
+            HttpServletRequest request) {
+
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Некорректный формат запроса",
+                "Тело запроса должно содержать валидный JSON",
+                request
         );
     }
 
