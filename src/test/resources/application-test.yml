@@ -14,6 +14,16 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
         format_sql: true
 
+minio:
+  url: http://localhost:9000
+  accessKey: test-access-key
+  secretKey: test-secret-key
+  buckets:
+    fileBucket:
+      name: test-files
+    reportBucket:
+      name: test-reports
+
 management:
   endpoints:
     web:

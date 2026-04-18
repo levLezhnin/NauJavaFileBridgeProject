@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:16.1-alpine
     container_name: dev-postgres-db
     restart: always
     env_file:
@@ -14,7 +14,7 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
     container_name: dev-minio-storage
     restart: always
     env_file:

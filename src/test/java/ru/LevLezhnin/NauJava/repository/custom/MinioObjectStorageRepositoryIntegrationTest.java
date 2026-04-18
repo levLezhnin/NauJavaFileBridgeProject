@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import ru.LevLezhnin.NauJava.constants.ContainerVersionConstants;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -23,7 +24,7 @@ class MinioObjectStorageRepositoryIntegrationTest {
 
     @Container
     static GenericContainer<?> minio =
-            new GenericContainer<>("minio/minio:latest")
+            new GenericContainer<>(ContainerVersionConstants.MINIO_CONTAINER_VERSION)
                     .withEnv("MINIO_ROOT_USER", ACCESS_KEY)
                     .withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
                     .withCommand("server /data")
