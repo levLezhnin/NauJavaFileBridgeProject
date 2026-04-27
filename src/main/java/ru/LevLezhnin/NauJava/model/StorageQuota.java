@@ -67,6 +67,10 @@ public class StorageQuota {
         this.user = user;
     }
 
+    public Long getBytesRemaining() {
+        return getMaxStorageBytes() - getUsedStorageBytes();
+    }
+
     public StorageQuota() {
         this.usedStorageBytes = 0L;
     }

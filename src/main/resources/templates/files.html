@@ -15,23 +15,22 @@
             <h1>Панель управления</h1>
             <p id="dashboardSubtitle">Следите за квотой, сроками и загрузками.</p>
         </div>
-        <a th:href="@{/upload}" class="btn btn-primary">Загрузить файл</a>
+        <a th:href="@{/upload}" class="btn btn-primary">⬆️ Загрузить файл</a>
     </section>
+    <div th:replace="~{fragments/alerts :: alerts}"></div>
     <section class="quota-card">
         <div>
             <h2>Квота</h2>
-            <p id="quotaInfo">Загрузка данных происходит через API.</p>
+            <p id="quotaInfo">Загрузка информации из API...</p>
         </div>
         <div class="quota-meta">
-            <span>0 / 0</span>
-            <span>0 файлов</span>
+            <span id="quotaUsage">0 / 0</span>
+            <span id="quotaFiles">0 файлов</span>
         </div>
     </section>
     <section class="files-list" id="filesList">
         <div class="empty-state">
-            <p class="empty-title">У вас пока нет файлов</p>
-            <p class="empty-text">Загрузите файл, чтобы увидеть его здесь.</p>
-            <a th:href="@{/upload}" class="btn btn-secondary">Загрузить файл</a>
+            <p class="empty-title">Загрузка файлов...</p>
         </div>
     </section>
 </main>

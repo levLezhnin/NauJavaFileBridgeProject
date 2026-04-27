@@ -13,3 +13,7 @@ management:
   endpoint:
     health:
       show-details: always
+
+app:
+  api:
+    base-url: ${API_BASE_URL:http://localhost:8080}

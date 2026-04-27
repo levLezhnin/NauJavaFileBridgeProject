@@ -13,17 +13,17 @@
         <div>
             <p class="eyebrow">Скачать файл</p>
             <h1>Запрос на загрузку</h1>
-            <p>Введите пароль, если он был установлен для этого файла.</p>
+            <p>Если для этого файла установлен пароль, введите его. Иначе просто нажмите кнопку «Скачать».</p>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
         <form id="downloadForm" class="form-card" novalidate>
             <input type="hidden" id="fileId" th:value="${fileId}" />
             <div class="form-group">
                 <label for="downloadPassword">Пароль</label>
-                <input id="downloadPassword" name="password" type="password" autocomplete="current-password" />
+                <input id="downloadPassword" name="password" type="password" autocomplete="current-password" placeholder="Оставьте пустым, если пароля нет" />
             </div>
-            <button type="submit" class="btn btn-primary">Скачать</button>
-            <p class="form-note">Если пароль не требуется, просто нажмите «Скачать».</p>
+            <button type="submit" class="btn btn-primary">⬇️ Скачать</button>
+            <p class="form-note">💡 Если пароль не требуется, просто нажмите «Скачать». Загруженный файл сохранится в вашу папку загрузок.</p>
         </form>
     </section>
 </main>

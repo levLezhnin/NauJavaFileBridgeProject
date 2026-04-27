@@ -24,6 +24,10 @@ minio:
     reportBucket:
       name: test-reports
 
+app:
+  api:
+    base-url: http://localhost:8080
+
 management:
   endpoints:
     web:

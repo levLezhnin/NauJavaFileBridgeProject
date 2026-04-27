@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM_VALUE;
+import static org.springframework.http.MediaType.TEXT_PLAIN_VALUE;
 
 @DataJpaTest
 @SpringJUnitConfig
@@ -123,11 +125,13 @@ public class UserRepositoryTest {
 
         // Создание файла для тестирования связи с пользователем
         testFile = File.builder()
-                .setPath("/files/test.txt")
+                .setId(UUID.randomUUID())
+                .setPath("/files/data.bin")
                 .setName("test.txt")
+                .setMimeType(TEXT_PLAIN_VALUE)
                 .setUploadedAt(Instant.now())
                 .setExpireAt(Instant.now().plus(7, ChronoUnit.DAYS))
-                .setMaxDownloads(10)
+                .setMaxDownloads(10L)
                 .setPasswordHash("file_password_hash")
                 .setAuthor(testUser1)
                 .setFileStatistics(fileStatistics)
@@ -308,11 +312,13 @@ public class UserRepositoryTest {
         entityManager.persist(newFileStats);
 
         File newFile = File.builder()
+                .setId(UUID.randomUUID())
                 .setPath("/files/new_file.txt")
                 .setName("new_file.txt")
+                .setMimeType(TEXT_PLAIN_VALUE)
                 .setUploadedAt(Instant.now())
                 .setExpireAt(Instant.now().plus(7, ChronoUnit.DAYS))
-                .setMaxDownloads(5)
+                .setMaxDownloads(5L)
                 .setPasswordHash("new_password_hash")
                 .setAuthor(author)
                 .setFileStatistics(newFileStats)
@@ -368,7 +374,7 @@ public class UserRepositoryTest {
                 .setName("quota_exceed.txt")
                 .setUploadedAt(Instant.now())
                 .setExpireAt(Instant.now().plus(7, ChronoUnit.DAYS))
-                .setMaxDownloads(5)
+                .setMaxDownloads(5L)
                 .setPasswordHash("password")
                 .setAuthor(author)
                 .setFileStatistics(newFileStats)

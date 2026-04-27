@@ -2,7 +2,6 @@ package ru.LevLezhnin.NauJava.model;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -13,7 +12,6 @@ import java.util.UUID;
 public class File {
 
     @Id
-    @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
     private UUID id;
 
     @Column(name = "path", columnDefinition = "TEXT", nullable = false, unique = true)
@@ -21,6 +19,9 @@ public class File {
 
     @Column(name = "name", nullable = false)
     private String name;
+
+    @Column(name = "mime_type", nullable = false)
+    private String mimeType;
 
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     @CreationTimestamp
@@ -30,9 +31,9 @@ public class File {
     private Instant expireAt;
 
     @Column(name = "max_downloads", nullable = false, updatable = false)
-    private Integer maxDownloads;
+    private Long maxDownloads;
 
-    @Column(name = "password_hash", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "password_hash", columnDefinition = "TEXT")
     private String passwordHash;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -67,6 +68,14 @@ public class File {
         this.name = name;
     }
 
+    public String getMimeType() {
+        return mimeType;
+    }
+
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
+    }
+
     public Instant getUploadedAt() {
         return uploadedAt;
     }
@@ -83,11 +92,11 @@ public class File {
         this.expireAt = expireAt;
     }
 
-    public Integer getMaxDownloads() {
+    public Long getMaxDownloads() {
         return maxDownloads;
     }
 
-    public void setMaxDownloads(Integer maxDownloads) {
+    public void setMaxDownloads(Long maxDownloads) {
         this.maxDownloads = maxDownloads;
     }
 
@@ -111,12 +120,17 @@ public class File {
         return fileStatistics;
     }
 
+    public boolean hasPassword() {
+        return passwordHash != null && !passwordHash.isBlank();
+    }
+
     public File() {}
 
-    public File(UUID id, String path, String name, Instant uploadedAt, Instant expireAt, Integer maxDownloads, String passwordHash, User author, FileStatistics fileStatistics) {
+    public File(UUID id, String path, String name, String mimeType, Instant uploadedAt, Instant expireAt, Long maxDownloads, String passwordHash, User author, FileStatistics fileStatistics) {
         this.id = id;
         this.path = path;
         this.name = name;
+        this.mimeType = mimeType;
         this.uploadedAt = uploadedAt;
         this.expireAt = expireAt;
         this.maxDownloads = maxDownloads;
@@ -131,6 +145,7 @@ public class File {
                 "id='" + id.toString() + '\'' +
                 ", path='" + path + '\'' +
                 ", name='" + name + '\'' +
+                ", mimeType='" + mimeType + '\'' +
                 ", uploadDate=" + uploadedAt +
                 ", expireDate=" + expireAt +
                 ", maxDownloads=" + maxDownloads +
@@ -159,9 +174,10 @@ public class File {
         private UUID id;
         private String path;
         private String name;
+        private String mimeType;
         private Instant uploadedAt;
         private Instant expireAt;
-        private Integer maxDownloads;
+        private Long maxDownloads;
         private String passwordHash;
         private User author;
         private FileStatistics fileStatistics;
@@ -193,6 +209,15 @@ public class File {
             return this;
         }
 
+        public String getMimeType() {
+            return mimeType;
+        }
+
+        public Builder setMimeType(String mimeType) {
+            this.mimeType = mimeType;
+            return this;
+        }
+
         public Instant getUploadedAt() {
             return uploadedAt;
         }
@@ -211,11 +236,11 @@ public class File {
             return this;
         }
 
-        public Integer getMaxDownloads() {
+        public Long getMaxDownloads() {
             return maxDownloads;
         }
 
-        public Builder setMaxDownloads(Integer maxDownloads) {
+        public Builder setMaxDownloads(Long maxDownloads) {
             this.maxDownloads = maxDownloads;
             return this;
         }
@@ -248,7 +273,7 @@ public class File {
         }
 
         public File build() {
-            return new File(id, path, name, uploadedAt, expireAt, maxDownloads, passwordHash, author, fileStatistics);
+            return new File(id, path, name, mimeType, uploadedAt, expireAt, maxDownloads, passwordHash, author, fileStatistics);
         }
     }
 }

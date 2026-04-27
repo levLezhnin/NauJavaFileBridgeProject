@@ -4,6 +4,8 @@ import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.InvalidMimeTypeException;
+import org.springframework.util.MimeTypeUtils;
 import ru.LevLezhnin.NauJava.exceptions.FileStorageException;
 
 import java.io.IOException;
@@ -24,6 +26,27 @@ public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
     @Override
     public void uploadWithPath(String path, InputStream inputStream, long size, String contentType) {
 
+        if (path == null || path.isBlank()) {
+            throw new IllegalArgumentException("Путь к файлу не может быть пустым");
+        }
+
+        if (inputStream == null) {
+            throw new IllegalArgumentException("InputStream не может быть null");
+        }
+
+        if (size <= 0) {
+            throw new IllegalArgumentException("Размер файла должен быть положительным");
+        }
+
+        if (contentType != null) {
+            try {
+                MimeTypeUtils.parseMimeType(contentType);
+            } catch (InvalidMimeTypeException e) {
+                logger.warn("Неизвестный MIME-тип: {}", contentType);
+                contentType = null;
+            }
+        }
+
         contentType = contentType != null && !contentType.isBlank() ? contentType : "application/octet-stream";
 
         try {
@@ -41,12 +64,10 @@ public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
             logger.error("Ошибка при загрузке файла {}: {}", path, e.getMessage(), e);
             throw FileStorageException.uploadFailed(path, e);
         } finally {
-            if (inputStream != null) {
-                try {
-                    inputStream.close();
-                } catch (IOException e) {
-                    logger.warn("Не удалось закрыть входной поток после загрузки файла {}: {}", path, e.getMessage());
-                }
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                logger.warn("Не удалось закрыть входной поток после загрузки файла {}: {}", path, e.getMessage());
             }
         }
     }
@@ -54,7 +75,7 @@ public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
     @Override
     public InputStream downloadByPath(String path) {
         try {
-            logger.debug("Скачивание файла из хранилиза: {}", path);
+            logger.debug("Скачивание файла из хранилища: {}", path);
             return minioClient.getObject(
                     GetObjectArgs.builder()
                             .bucket(bucketName)

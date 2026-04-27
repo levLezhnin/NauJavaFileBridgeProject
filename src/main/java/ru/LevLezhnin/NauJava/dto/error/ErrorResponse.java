@@ -1,4 +1,4 @@
-package ru.LevLezhnin.NauJava.dto;
+package ru.LevLezhnin.NauJava.dto.error;
 
 public record ErrorResponse(
         String localDateTime,

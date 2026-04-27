@@ -23,6 +23,11 @@ spring:
     properties:
       hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 200MB
+
 minio:
   url: http://${MINIO_HOST}:${MINIO_PORT}
   accessKey: ${MINIO_ACCESS_KEY}
@@ -38,11 +43,13 @@ app:
   name: File Bridge
   version: 1.0
 
+  api:
+    base-url: ${API_BASE_URL}
+
   quotas:
     tariffs:
       BASIC:
         maxStorageSize: 1GB
-        maxFileSize: 100MB
 
 jwt:
   accessSecret: ${ACCESS_JWT_SECRET}

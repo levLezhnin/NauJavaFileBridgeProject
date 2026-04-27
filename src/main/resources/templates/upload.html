@@ -13,30 +13,37 @@
         <div class="panel-header">
             <p class="eyebrow">Загрузка</p>
             <h1>Отправьте файл в облако</h1>
-            <p>Выберите файл, настройте срок и количество загрузок.</p>
+            <p>Выберите файл, настройте срок жизни и максимум скачиваний.</p>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <div id="validationSummary" class="validation-summary" style="display: none;" role="alert" aria-live="assertive">
+          <p class="validation-summary__text"></p>
+          <ul class="validation-summary__list"></ul>
+        </div>
         <form id="uploadForm" class="form-card" novalidate>
-            <label class="dropzone" for="fileInput" id="dropzone">
-                <input id="fileInput" name="file" type="file" hidden />
-                <span>Перетащите файл или нажмите, чтобы выбрать.</span>
-            </label>
-            <div class="form-row">
+            <div class="form-group">
+                <label class="dropzone" for="fileInput" id="dropzone">
+                    <input id="fileInput" name="file" type="file" hidden />
+                    <span>📁 Перетащите файл или нажмите, чтобы выбрать</span>
+                </label>
+            </div>
+            <div class="form-row-vertical">
                 <div class="form-group">
-                    <label for="ttl">Срок жизни (часы)</label>
-                    <input id="ttl" name="ttl" type="number" min="1" max="720" value="24" />
+                    <label for="ttl">Срок жизни (дней)</label>
+                    <input id="ttl" name="ttl" type="number" min="1" max="14" value="1" required />
+                    <p class="hint">От 1 до 14 дней</p>
                 </div>
                 <div class="form-group">
                     <label for="maxDownloads">Максимум скачиваний</label>
-                    <input id="maxDownloads" name="maxDownloads" type="number" min="1" max="1000" value="10" />
+                    <input id="maxDownloads" name="maxDownloads" type="number" min="1" max="1000" value="10" required />
                 </div>
             </div>
             <div class="form-group">
                 <label for="password">Пароль (необязательно)</label>
-                <input id="password" name="password" type="password" autocomplete="new-password" />
+                <input id="password" name="password" type="password" autocomplete="new-password" placeholder="Оставьте пустым, если защита не нужна" />
             </div>
-            <button type="submit" class="btn btn-primary">Загрузить</button>
-            <p class="form-note">Если файл требует пароля при скачивании, укажите его здесь.</p>
+            <button type="submit" class="btn btn-primary">⬆️ Загрузить</button>
+            <p class="form-note">💡 Файл будет защищён паролем только если вы его установите. Максимальный размер файла: 100 МБ.</p>
         </form>
     </section>
 </main>

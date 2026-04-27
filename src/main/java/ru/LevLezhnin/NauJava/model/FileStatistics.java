@@ -61,6 +61,10 @@ public class FileStatistics {
         return file;
     }
 
+    public void incrementDownloads() {
+        this.timesDownloaded++;
+    }
+
     public FileStatistics() {
         this.timesDownloaded = 0L;
     }
