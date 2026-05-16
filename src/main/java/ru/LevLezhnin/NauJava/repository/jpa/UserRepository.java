@@ -1,9 +1,11 @@
 package ru.LevLezhnin.NauJava.repository.jpa;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import ru.LevLezhnin.NauJava.model.User;
 
 import java.util.List;
@@ -16,4 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     Optional<User> findByEmail(String email);
     List<User> findAllByOrderByIdAsc(Pageable pageable);
     List<User> findByUsernameLikeIgnoreCase(String username, Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<User> findForUpdateById(Long id);
 }

@@ -1,3 +1,7 @@
 package ru.LevLezhnin.NauJava.dto.auth;
 
-public record JwtRefreshRequestDto(String refreshToken) {}
+import jakarta.validation.constraints.NotBlank;
+
+public record JwtRefreshRequestDto(
+        @NotBlank(message = "Refresh токен должен быть заполнен")
+        String refreshToken) {}

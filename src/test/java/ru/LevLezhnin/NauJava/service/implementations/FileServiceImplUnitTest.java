@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.internal.verification.VerificationModeFactory;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -16,7 +15,10 @@ import ru.LevLezhnin.NauJava.dto.file.FileDownloadRequestDto;
 import ru.LevLezhnin.NauJava.dto.file.FileDownloadResponseDto;
 import ru.LevLezhnin.NauJava.dto.file.FileResponseDto;
 import ru.LevLezhnin.NauJava.dto.file.FileUploadRequestDto;
-import ru.LevLezhnin.NauJava.exceptions.*;
+import ru.LevLezhnin.NauJava.exceptions.StorageQuotaExceededException;
+import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
+import ru.LevLezhnin.NauJava.exceptions.file.*;
 import ru.LevLezhnin.NauJava.mapper.FileResponseMapper;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.custom.ObjectStorageRepository;
@@ -307,6 +309,7 @@ class FileServiceImplUnitTest {
         when(requestContextService.getUserId()).thenReturn(testUser.getId());
 
         when(userRepository.findWithDetailsById(testUser.getId())).thenReturn(Optional.of(testUser));
+        doThrow(StorageQuotaExceededException.class).when(storageQuotaService).updateStorageQuota(eq(testUserStorageQuota.getId()), any(Long.class));
 
         InputStream testFileData = new ByteArrayInputStream(TEST_DATA.getBytes(StandardCharsets.UTF_8));
 
@@ -319,8 +322,8 @@ class FileServiceImplUnitTest {
                 null
         );
 
-        assertThrows(FileTooLargeException.class, () -> fileService.uploadFile(fileUploadRequestDto, testFileData),
-                "Загрузка файла должна завершиться с ошибкой FileTooLargeException, если загружаемый файл не помещается в остающееся место");
+        assertThrows(StorageQuotaExceededException.class, () -> fileService.uploadFile(fileUploadRequestDto, testFileData),
+                "Загрузка файла должна завершиться с ошибкой StorageQuotaExceededException, если загружаемый файл не помещается в остающееся место");
     }
 
     @Test
@@ -348,7 +351,7 @@ class FileServiceImplUnitTest {
         assertThrows(FileUploadException.class, () -> fileService.uploadFile(fileUploadRequestDto, testFileData));
 
         ArgumentCaptor<File> fileArgumentCaptor = ArgumentCaptor.forClass(File.class);
-        verify(fileRepository, VerificationModeFactory.times(1)).save(fileArgumentCaptor.capture());
+        verify(fileRepository, times(1)).save(fileArgumentCaptor.capture());
 
         File capturedFile = fileArgumentCaptor.getValue();
         assertTrue(capturedFile.getPath().matches("/files/userId=\\d+/fileId=.+/data.bin"),
@@ -359,7 +362,7 @@ class FileServiceImplUnitTest {
                 "Хеш пароля файла должен совпадать с закодированным значением");
 
         ArgumentCaptor<FileStatistics> statisticsArgumentCaptor = ArgumentCaptor.forClass(FileStatistics.class);
-        verify(fileStatisticsRepository, VerificationModeFactory.times(1)).save(statisticsArgumentCaptor.capture());
+        verify(fileStatisticsRepository, times(1)).save(statisticsArgumentCaptor.capture());
 
         FileStatistics capturedStatistics = statisticsArgumentCaptor.getValue();
         assertEquals(fileUploadRequestDto.fileSize(), capturedStatistics.getSizeBytes(),
@@ -367,8 +370,6 @@ class FileServiceImplUnitTest {
         assertThat(capturedFile.getFileStatistics()).isSameAs(capturedStatistics);
         assertEquals(0L, capturedStatistics.getTimesDownloaded(),
                 "Счётчик скачиваний нового файла должен быть равен 0");
-
-        verify(storageQuotaService, never()).updateStorageQuota(any(Long.class), any(Long.class));
 
         ArgumentCaptor<InputStream> streamArgumentCaptor = ArgumentCaptor.forClass(InputStream.class);
         verify(fileStorageRepository, times(1)).uploadWithPath(any(String.class), streamArgumentCaptor.capture(), eq(1L), eq(MediaType.APPLICATION_OCTET_STREAM_VALUE));
@@ -545,14 +546,19 @@ class FileServiceImplUnitTest {
         when(requestContextService.getUserId()).thenReturn(testUser.getId());
         when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         when(fileRepository.findWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
+        doAnswer(args -> {
+            Long delta = args.getArgument(1);
+            testUserStorageQuota.setUsedStorageBytes(testUserStorageQuota.getUsedStorageBytes() + delta);
+            return null;
+        }).when(storageQuotaService).updateStorageQuota(eq(testUserStorageQuota.getId()), any(Long.class));
 
         fileService.deleteById(testFile.getId().toString());
 
         verify(fileStorageRepository, times(1)).deleteByPath(testFilePath);
         verify(fileRepository, times(1)).deleteById(testFile.getId());
 
-        Long expectedUsedBytes = testUserStorageQuota.getUsedStorageBytes() - testFile.getFileStatistics().getSizeBytes();
-        verify(storageQuotaService, times(1)).updateStorageQuota(testUserStorageQuota.getId(), expectedUsedBytes);
+        Long expectedDelta = -testFile.getFileStatistics().getSizeBytes();
+        verify(storageQuotaService, times(1)).updateStorageQuota(testUserStorageQuota.getId(), expectedDelta);
     }
 
     @Test
@@ -563,14 +569,19 @@ class FileServiceImplUnitTest {
         when(requestContextService.getUserId()).thenReturn(testAdmin.getId());
         when(userRepository.findById(testAdmin.getId())).thenReturn(Optional.of(testAdmin));
         when(fileRepository.findWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
+        doAnswer(args -> {
+            Long delta = args.getArgument(1);
+            testUserStorageQuota.setUsedStorageBytes(testUserStorageQuota.getUsedStorageBytes() + delta);
+            return null;
+        }).when(storageQuotaService).updateStorageQuota(eq(testUserStorageQuota.getId()), any(Long.class));
 
         fileService.deleteById(testFile.getId().toString());
 
         verify(fileStorageRepository, times(1)).deleteByPath(testFilePath);
         verify(fileRepository, times(1)).deleteById(testFile.getId());
 
-        Long expectedUsedBytes = testUserStorageQuota.getUsedStorageBytes() - testFile.getFileStatistics().getSizeBytes();
-        verify(storageQuotaService, times(1)).updateStorageQuota(testUserStorageQuota.getId(), expectedUsedBytes);
+        Long expectedDelta = -testFile.getFileStatistics().getSizeBytes();
+        verify(storageQuotaService, times(1)).updateStorageQuota(testUserStorageQuota.getId(), expectedDelta);
     }
 
     @Test

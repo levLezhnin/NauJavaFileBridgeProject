@@ -21,6 +21,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import ru.LevLezhnin.NauJava.security.filter.JwtRequestFilter;
+import ru.LevLezhnin.NauJava.security.filter.UserBanFilter;
 import ru.LevLezhnin.NauJava.model.UserRole;
 
 import java.util.Map;
@@ -33,10 +35,12 @@ public class SecurityConfig {
 
     private final UserDetailsService userDetailsService;
     private final JwtRequestFilter jwtRequestFilter;
+    private final UserBanFilter userBanFilter;
 
-    public SecurityConfig(UserDetailsService userDetailsService, JwtRequestFilter jwtRequestFilter) {
+    public SecurityConfig(UserDetailsService userDetailsService, JwtRequestFilter jwtRequestFilter, UserBanFilter userBanFilter) {
         this.userDetailsService = userDetailsService;
         this.jwtRequestFilter = jwtRequestFilter;
+        this.userBanFilter = userBanFilter;
     }
 
     @Bean
@@ -127,6 +131,7 @@ public class SecurityConfig {
                         })))
 
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(userBanFilter, JwtRequestFilter.class)
                 .build();
     }
 

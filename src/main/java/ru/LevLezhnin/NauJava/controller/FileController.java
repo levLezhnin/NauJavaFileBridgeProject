@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriUtils;
 import ru.LevLezhnin.NauJava.dto.file.*;
-import ru.LevLezhnin.NauJava.exceptions.FileUploadException;
+import ru.LevLezhnin.NauJava.exceptions.file.FileUploadException;
 import ru.LevLezhnin.NauJava.service.interfaces.FileService;
 
 import java.io.IOException;

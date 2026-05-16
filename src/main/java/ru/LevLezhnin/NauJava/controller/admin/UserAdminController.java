@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.LevLezhnin.NauJava.model.User;
+import ru.LevLezhnin.NauJava.dto.user.UserProfileAdminResponseDto;
 import ru.LevLezhnin.NauJava.service.interfaces.UserService;
 
 import java.util.List;
@@ -22,10 +22,10 @@ public class UserAdminController {
     }
 
     @GetMapping
-    public List<User> findAllByCriteria(@RequestParam("searchBy") String searchBy,
-                                        @RequestParam("search") String search,
-                                        @RequestParam("page_size") int pageSize,
-                                        @RequestParam("page") int page) {
+    public List<UserProfileAdminResponseDto> findAllByCriteria(@RequestParam("searchBy") String searchBy,
+                                                               @RequestParam("search") String search,
+                                                               @RequestParam("page_size") int pageSize,
+                                                               @RequestParam("page") int page) {
         return userService.findByCriteria(searchBy, search, page, pageSize);
     }
 }

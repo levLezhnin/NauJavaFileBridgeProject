@@ -3,36 +3,35 @@ package ru.LevLezhnin.NauJava.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import ru.LevLezhnin.NauJava.dto.auth.JwtLoginRequestDto;
-import ru.LevLezhnin.NauJava.dto.auth.JwtRefreshRequestDto;
-import ru.LevLezhnin.NauJava.dto.auth.JwtResponseDto;
-import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
-import ru.LevLezhnin.NauJava.security.JwtProperties;
+import ru.LevLezhnin.NauJava.dto.auth.*;
+import ru.LevLezhnin.NauJava.security.properties.JwtProperties;
 import ru.LevLezhnin.NauJava.service.interfaces.AuthService;
 import ru.LevLezhnin.NauJava.utils.TokenCookieService;
 
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
-    private final AuthService authService;
-    private final JwtProperties jwtProperties;
-    private final TokenCookieService tokenCookieService;
 
-    public AuthController(AuthService authService, JwtProperties jwtProperties, TokenCookieService tokenCookieService) {
+    private final AuthService authService;
+    private final TokenCookieService tokenCookieService;
+    private final JwtProperties jwtProperties;
+
+    public AuthController(AuthService authService, TokenCookieService tokenCookieService, JwtProperties jwtProperties) {
         this.authService = authService;
-        this.jwtProperties = jwtProperties;
         this.tokenCookieService = tokenCookieService;
+        this.jwtProperties = jwtProperties;
     }
 
     @PostMapping("/register")
     public ResponseEntity<Void> register(
-            @RequestBody RegistrationRequestDto request,
+            @RequestBody @Valid RegistrationRequestDto request,
             HttpServletResponse response) {
 
         JwtResponseDto tokens = authService.register(request);
@@ -43,7 +42,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<Void> login(
-            @RequestBody JwtLoginRequestDto request,
+            @RequestBody @Valid JwtLoginRequestDto request,
             HttpServletResponse response) {
 
         JwtResponseDto tokens = authService.login(request);
@@ -58,13 +57,29 @@ public class AuthController {
         String refreshToken = tokenCookieService.getTokenFromCookie(request, JwtProperties.JWT_REFRESH_TOKEN_COOKIE_NAME);
 
         JwtResponseDto tokens = authService.refresh(new JwtRefreshRequestDto(refreshToken));
-        setTokenCookies(response, tokens);
+
+        tokenCookieService.setTokenCookie(response, JwtProperties.JWT_ACCESS_TOKEN_COOKIE_NAME, tokens.accessToken(), jwtProperties.getAccessTokenLifetime().getSeconds());
 
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        String accessToken = tokenCookieService.getTokenFromCookie(request, JwtProperties.JWT_ACCESS_TOKEN_COOKIE_NAME);
+        String refreshToken = tokenCookieService.getTokenFromCookie(request, JwtProperties.JWT_REFRESH_TOKEN_COOKIE_NAME);
+
+        authService.logout(new JwtLogoutRequestDto(accessToken, refreshToken));
+        clearSession(request, response);
+
+        return ResponseEntity.ok().build();
+    }
+
+    private void setTokenCookies(HttpServletResponse response, JwtResponseDto tokens) {
+        tokenCookieService.setTokenCookie(response, JwtProperties.JWT_ACCESS_TOKEN_COOKIE_NAME, tokens.accessToken(), jwtProperties.getAccessTokenLifetime().getSeconds());
+        tokenCookieService.setTokenCookie(response, JwtProperties.JWT_REFRESH_TOKEN_COOKIE_NAME, tokens.refreshToken(), jwtProperties.getRefreshTokenLifetime().getSeconds());
+    }
+
+    private void clearSession(HttpServletRequest request, HttpServletResponse response) {
         tokenCookieService.clearCookie(response, JwtProperties.JWT_ACCESS_TOKEN_COOKIE_NAME);
         tokenCookieService.clearCookie(response, JwtProperties.JWT_REFRESH_TOKEN_COOKIE_NAME);
 
@@ -74,12 +89,5 @@ public class AuthController {
         if (httpSession != null) {
             httpSession.invalidate();
         }
-
-        return ResponseEntity.ok().build();
-    }
-
-    private void setTokenCookies(HttpServletResponse response, JwtResponseDto tokens) {
-        tokenCookieService.setTokenCookie(response, JwtProperties.JWT_ACCESS_TOKEN_COOKIE_NAME, tokens.accessToken(), jwtProperties.getAccessTokenLifetime().getSeconds());
-        tokenCookieService.setTokenCookie(response, JwtProperties.JWT_REFRESH_TOKEN_COOKIE_NAME, tokens.refreshToken(), jwtProperties.getRefreshTokenLifetime().getSeconds());
     }
 }

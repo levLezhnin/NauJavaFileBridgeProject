@@ -3,6 +3,7 @@ package ru.LevLezhnin.NauJava.repository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
@@ -11,6 +12,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import ru.LevLezhnin.NauJava.constants.ContainerVersionConstants;
 import ru.LevLezhnin.NauJava.utils.DataSizeConstants;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.custom.UserRepositoryImpl;
@@ -30,9 +35,14 @@ import static org.springframework.http.MediaType.TEXT_PLAIN_VALUE;
 
 @DataJpaTest
 @SpringJUnitConfig
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(UserRepositoryImpl.class)
 @ActiveProfiles("test")
+@Testcontainers
 public class UserRepositoryTest {
+
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(ContainerVersionConstants.POSTGRES_CONTAINER_VERSION);
 
     @Autowired
     private TestEntityManager entityManager;
@@ -180,7 +190,7 @@ public class UserRepositoryTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         // When
-        List<UserBan> banHistory = userBanRepository.findUserBanHistory(testUser2.getId(), pageable);
+        List<UserBan> banHistory = userBanRepository.findUserBanHistory(testUser2.getId(), pageable).stream().toList();
 
         // Then
         assertThat(banHistory).isNotEmpty();

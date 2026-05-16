@@ -68,9 +68,7 @@ public class ViewController {
     }
 
     @GetMapping("/admin/users/list")
-    public String userListView(Model model) {
-        List<User> users = userRepository.findAll();
-        model.addAttribute("users", users);
+    public String userListView() {
         return "userList";
     }
 

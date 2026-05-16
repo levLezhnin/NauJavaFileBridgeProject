@@ -36,6 +36,11 @@ button {
   margin: 0 auto;
   padding: 1.5rem 1.25rem 3rem;
 }
+.page-shell.full-width {
+  max-width: 100%;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
 .site-header {
   display: flex;
   justify-content: space-between;
@@ -97,6 +102,30 @@ button {
   background: var(--danger);
   color: #fff;
 }
+.btn-success {
+  background: #22c55e;
+  color: #fff;
+}
+.btn-info {
+  background: #0ea5e9;
+  color: #fff;
+}
+.btn-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+}
+.status-active {
+  color: var(--primary);
+  font-weight: 600;
+}
+.status-banned {
+  color: var(--danger);
+  font-weight: 600;
+}
+.text-muted {
+  color: var(--muted);
+}
 .hero-card,
 .auth-panel,
 .error-card,
@@ -110,7 +139,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 24px;
   box-shadow: var(--shadow);
-  padding: 2rem;
+  padding: 1rem;
 }
 .hero-card {
   display: grid;
@@ -140,7 +169,7 @@ button {
 .form-note,
 .empty-text,
 .profile-item p {
-  color: var(--muted);
+  color: var(--text);
   line-height: 1.8;
 }
 .hero-actions {
@@ -268,11 +297,17 @@ button {
 .auth-panel,
 .upload-panel,
 .download-card,
-.profile-card,
-.table-card,
-.error-card {
+.profile-card {
   max-width: 560px;
   margin: 2rem auto;
+}
+.error-card {
+  max-width: none;
+  margin: 2rem 0;
+}
+.table-card {
+  max-width: none;
+  margin: 2rem 0;
 }
 .form-card {
   display: grid;
@@ -286,7 +321,8 @@ button {
   font-weight: 600;
 }
 .form-group input,
-.form-row input {
+.form-row input,
+.form-control {
   width: 100%;
   padding: 0.95rem 1rem;
   border-radius: 16px;
@@ -295,27 +331,34 @@ button {
   transition: all 0.2s ease;
 }
 .form-group input:focus,
-.form-row input:focus {
+.form-row input:focus,
+.form-control:focus {
   outline: none;
   border-color: var(--primary);
   background: var(--surface);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 .form-group input.field-error,
-.form-row input.field-error {
+.form-row input.field-error,
+.form-control.field-error {
   border-color: var(--danger);
-  background: #fef2f2;
+  background: #fef2f2 !important;
 }
 .form-group input.field-error:focus,
-.form-row input.field-error:focus {
+.form-row input.field-error:focus,
+.form-control.field-error:focus {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 .field-error-message {
-  color: var(--danger);
-  font-size: 0.85rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
   margin-top: 0.25rem;
+  color: #991b1b !important;
+  font-size: 0.85rem;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.25rem;
 }
 .field-error-message::before {
@@ -370,7 +413,10 @@ button {
 .validation-summary__text {
   margin: 0;
   font-weight: 600;
+  color: #991b1b !important
 }
+
+
 .dropzone {
   display: grid;
   place-items: center;
@@ -424,6 +470,9 @@ button {
   margin-bottom: 0.5rem;
   font-size: 1.4rem;
 }
+.table-card {
+  overflow-x: auto;
+}
 .table-card table {
   width: 100%;
   border-collapse: collapse;
@@ -442,10 +491,88 @@ button {
   display: grid;
   gap: 1rem;
 }
+
+/* Ban info styles */
+.ban-info {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: var(--surface-strong);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.ban-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--danger);
+  margin-bottom: 1rem;
+}
+
+.ban-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ban-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 1.2rem;
+}
+
+.detail-value {
+  color: #0f172a;
+  font-size: 1.1rem;
+  font-weight: 400;
+  word-wrap: break-word;
+}
 .profile-item {
   padding: 1.25rem;
   border-radius: 20px;
   background: var(--surface-strong);
+}
+
+.profile-item-danger {
+  background: #fef2f2;
+  border: 2px solid var(--danger);
+}
+
+.profile-item-danger h2 {
+  color: var(--danger);
+}
+
+.profile-item-danger p {
+  color: #991b1b;
+}
+.profile-info {
+  background: var(--surface-strong);
+}
+.profile-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text) !important;
+}
+.quota-value {
+  font-weight: 600;
+  color: var(--primary);
+}
+.quota-files {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+#quotaInfo {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+.link {
+  color: var(--primary);
+  text-decoration: underline;
 }
 .report-card {
   margin-top: 1.5rem;
@@ -676,13 +803,20 @@ button {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.modal-backdrop:not([hidden]) {
+  opacity: 1;
+  visibility: visible;
 }
 .modal-backdrop[hidden] {
   display: none;
@@ -691,8 +825,11 @@ button {
   background: var(--surface);
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  max-width: 420px;
-  width: 90%;
+  max-width: 90vw;
+  width: 90vw;
+  max-height: 85vh;
+  height: auto;
+  min-height: 50vh;
 }
 .modal-header {
   display: flex;
@@ -726,6 +863,166 @@ button {
 }
 .modal-body {
   padding: 1.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+.modal-ban .modal-body {
+  padding: 2rem;
+}
+.modal-unban .modal-body {
+  padding: 2rem;
+}
+
+/* Ban modal styles */
+.form-label {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.form-control {
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  transition: all 0.2s ease;
+  font-family: inherit;
+  resize: vertical;
+}
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ban-details-modal {
+  background: var(--surface-strong);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.ban-detail-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+.ban-detail-modal:last-child {
+  margin-bottom: 0;
+}
+.detail-label-modal {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.detail-value-modal {
+  color: var(--muted);
+  font-size: 0.95rem;
+  word-wrap: break-word;
+}
+.confirm-text {
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+/* Ban history modal */
+.modal-history .modal-body {
+  padding: 2rem;
+  max-height: 60vh;
+}
+
+.ban-history-wrapper {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.ban-history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ban-history-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.ban-history-table th,
+.ban-history-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.ban-history-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ban-history-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ban-history-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ban-history-table th,
+.ban-history-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.ban-history-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.ban-history-table {
+  overflow-x: auto;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.search-form select,
+.search-form input {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.search-form input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.modal-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 .modal-footer {
   display: flex;
@@ -736,6 +1033,13 @@ button {
 }
 .modal-footer .btn {
   flex: 1;
+}
+.forbidden-description {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.6;
+  margin-top: 1.5rem;
 }
 
 @media (max-width: 900px) {

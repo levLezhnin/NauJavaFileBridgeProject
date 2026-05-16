@@ -1,9 +1,8 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:tc:postgresql:16-alpine:///testdb
+    username: test
+    password: test
 
   jpa:
     hibernate:
@@ -11,7 +10,7 @@ spring:
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
 minio:
@@ -27,6 +26,12 @@ minio:
 app:
   api:
     base-url: http://localhost:8080
+  default:
+    default-admin:
+      username: DefaultAdmin
+      email: dafault@default.com
+      password: DeF@uLtADm1N_P@sswOrd
+      quota-size: 100GB
 
 management:
   endpoints:

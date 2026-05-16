@@ -2,10 +2,13 @@ package ru.LevLezhnin.NauJava.exceptionhandling;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +19,14 @@ import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
 import ru.LevLezhnin.NauJava.dto.error.FieldError;
 import ru.LevLezhnin.NauJava.dto.error.ValidationError;
 import ru.LevLezhnin.NauJava.exceptions.*;
+import ru.LevLezhnin.NauJava.exceptions.auth.InvalidTokenException;
+import ru.LevLezhnin.NauJava.exceptions.auth.TokenExpiredException;
+import ru.LevLezhnin.NauJava.exceptions.auth.TokenRevokedException;
+import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
+import ru.LevLezhnin.NauJava.exceptions.common.SelfActionForbiddenException;
+import ru.LevLezhnin.NauJava.exceptions.file.*;
+import ru.LevLezhnin.NauJava.exceptions.user.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -25,8 +36,11 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class ExceptionControllerAdvice {
 
+    private static final Logger log = LoggerFactory.getLogger(ExceptionControllerAdvice.class);
+
     @ExceptionHandler(value = Exception.class)
     public ResponseEntity<ErrorResponse> exceptionHandler(Exception e, HttpServletRequest httpServletRequest) {
+        log.error("Не найден обработчик для исключения. URI запроса: {}. Сообщение: {}", httpServletRequest.getRequestURI(), e.getMessage(), e);
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Внутренняя ошибка сервера",
@@ -53,7 +67,7 @@ public class ExceptionControllerAdvice {
         return buildResponse(
                 HttpStatus.BAD_REQUEST,
                 "Некорректный запрос",
-                "Параметры запроса указаны неверно. Проверьте введённые данные.",
+                e.getMessage(),
                 httpServletRequest);
     }
 
@@ -61,7 +75,7 @@ public class ExceptionControllerAdvice {
     public ResponseEntity<ErrorResponse> entityNotFoundExceptionHandler(EntityNotFoundException e, HttpServletRequest httpServletRequest) {
         return buildResponse(
                 HttpStatus.NOT_FOUND,
-                "Сущность не найден",
+                "Сущность не найдена",
                 e.getMessage(),
                 httpServletRequest
         );
@@ -227,6 +241,110 @@ public class ExceptionControllerAdvice {
                 ex.getMessage(),
                 httpServletRequest
         );
+    }
+
+    @ExceptionHandler(UsernameTakenException.class)
+    public ResponseEntity<ErrorResponse> handleUsernameTaken(UsernameTakenException ex, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "Логин уже занят другим пользователем",
+                ex.getMessage(),
+                httpServletRequest
+        );
+    }
+
+    @ExceptionHandler(InvalidLoginException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidLogin(InvalidLoginException ex, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Логин уже занят другим пользователем",
+                ex.getMessage(),
+                httpServletRequest
+        );
+    }
+
+    @ExceptionHandler(EmailTakenException.class)
+    public ResponseEntity<ErrorResponse> handleEmailTaken(EmailTakenException ex, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "Email уже занят другим пользователем",
+                ex.getMessage(),
+                httpServletRequest
+        );
+    }
+
+    @ExceptionHandler(InvalidSearchCriteriaException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidSearchCriteria(InvalidSearchCriteriaException ex, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Неверно задан критерий поиска",
+                ex.getMessage(),
+                httpServletRequest
+        );
+    }
+
+    @ExceptionHandler(SelfActionForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleSelfActionForbidden(SelfActionForbiddenException ex, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.FORBIDDEN,
+                "Действие пользователя над самим собой запрещено",
+                ex.getMessage(),
+                httpServletRequest);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        return buildResponse(
+                HttpStatus.FORBIDDEN,
+                "У вас нет прав на выполнение этого действия",
+                ex.getMessage(),
+                request
+        );
+    }
+
+    @ExceptionHandler(UserAlreadyBannedException.class)
+    public ResponseEntity<ErrorResponse> handleUserAlreadyBanned(UserAlreadyBannedException ex, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Пользователь уже заблокирован",
+                ex.getMessage(),
+                httpServletRequest);
+    }
+
+    @ExceptionHandler(UserNotBannedException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotBanned(UserNotBannedException ex, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Пользователь не заблокирован",
+                ex.getMessage(),
+                httpServletRequest);
+    }
+
+    @ExceptionHandler(TokenRevokedException.class)
+    public ResponseEntity<ErrorResponse> handleTokenRevoked(TokenRevokedException e, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.UNAUTHORIZED,
+                "Токен отозван",
+                e.getMessage(),
+                httpServletRequest);
+    }
+
+    @ExceptionHandler(TokenExpiredException.class)
+    public ResponseEntity<ErrorResponse> handleTokenExpired(TokenExpiredException e, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.UNAUTHORIZED,
+                "Истёк срок действия токена",
+                e.getMessage(),
+                httpServletRequest);
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidToken(InvalidTokenException e, HttpServletRequest httpServletRequest) {
+        return buildResponse(
+                HttpStatus.UNAUTHORIZED,
+                "Невалидный токен",
+                e.getMessage(),
+                httpServletRequest);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String error, String message, HttpServletRequest request) {

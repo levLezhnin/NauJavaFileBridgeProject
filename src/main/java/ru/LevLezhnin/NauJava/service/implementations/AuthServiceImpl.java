@@ -1,44 +1,48 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import ru.LevLezhnin.NauJava.dto.auth.JwtLoginRequestDto;
-import ru.LevLezhnin.NauJava.dto.auth.JwtRefreshRequestDto;
-import ru.LevLezhnin.NauJava.dto.auth.JwtResponseDto;
-import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
-import ru.LevLezhnin.NauJava.model.User;
+import ru.LevLezhnin.NauJava.dto.auth.*;
+import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
+import ru.LevLezhnin.NauJava.exceptions.auth.TokenRevokedException;
+import ru.LevLezhnin.NauJava.security.userdetails.IdentifiableUserDetailsService;
 import ru.LevLezhnin.NauJava.service.interfaces.AuthService;
+import ru.LevLezhnin.NauJava.service.interfaces.TokenBlacklistService;
 import ru.LevLezhnin.NauJava.service.interfaces.UserService;
 import ru.LevLezhnin.NauJava.utils.JwtTokenHelper;
+
+import java.time.Duration;
 
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    private final UserDetailsService userDetailsService;
+    private final IdentifiableUserDetailsService userDetailsService;
     private final JwtTokenHelper jwtTokenHelper;
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Autowired
-    public AuthServiceImpl(UserDetailsService userDetailsService, JwtTokenHelper jwtTokenHelper, AuthenticationManager authenticationManager, PasswordEncoder passwordEncryptor, UserService userService) {
+    public AuthServiceImpl(IdentifiableUserDetailsService userDetailsService, JwtTokenHelper jwtTokenHelper, AuthenticationManager authenticationManager, UserService userService, TokenBlacklistService tokenBlacklistService) {
         this.userDetailsService = userDetailsService;
         this.jwtTokenHelper = jwtTokenHelper;
         this.authenticationManager = authenticationManager;
         this.userService = userService;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
 
     @Override
     public JwtResponseDto register(RegistrationRequestDto registrationRequestDto) {
-        User user = userService.createUser(registrationRequestDto);
-        var userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+        UserProfileResponseDto user = userService.createUser(registrationRequestDto);
+        var userDetails = userDetailsService.loadUserByUsername(user.username());
         return new JwtResponseDto(
                 jwtTokenHelper.generateAccessToken(userDetails),
                 jwtTokenHelper.generateRefreshToken(userDetails)
@@ -55,18 +59,37 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public JwtResponseDto refresh(JwtRefreshRequestDto jwtRefreshRequestDto) {
+    public JwtResponseDto refresh(@Valid JwtRefreshRequestDto jwtRefreshRequestDto) {
         String refreshToken = jwtRefreshRequestDto.refreshToken();
 
-        if (refreshToken == null || !jwtTokenHelper.isRefreshToken(refreshToken)) {
-            throw new IllegalArgumentException("Невалидный refresh token");
+        jwtTokenHelper.validateRefreshToken(refreshToken);
+
+        if (tokenBlacklistService.isTokenBlacklisted(refreshToken)) {
+            throw new TokenRevokedException("Refresh токен отозван");
         }
 
-        String username = jwtTokenHelper.getUserNameFromRefreshToken(refreshToken);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        Long userId = jwtTokenHelper.getUserIdFromRefreshToken(refreshToken);
+        UserDetails userDetails = userDetailsService.loadUserById(userId);
 
         String newAccessToken = jwtTokenHelper.generateAccessToken(userDetails);
 
         return new JwtResponseDto(newAccessToken, refreshToken);
+    }
+
+    @Override
+    public void logout(@Valid JwtLogoutRequestDto jwtLogoutRequestDto) {
+
+        String accessToken = jwtLogoutRequestDto.accessToken();
+        String refreshToken = jwtLogoutRequestDto.refreshToken();
+
+        if (accessToken != null && jwtTokenHelper.isAccessToken(accessToken)) {
+            Duration ttl = jwtTokenHelper.getRemainingAccessTtl(accessToken);
+            tokenBlacklistService.blacklistToken(accessToken, ttl);
+        }
+
+        if (refreshToken != null && jwtTokenHelper.isRefreshToken(refreshToken)) {
+            Duration ttl = jwtTokenHelper.getRemainingRefreshTtl(refreshToken);
+            tokenBlacklistService.blacklistToken(refreshToken, ttl);
+        }
     }
 }

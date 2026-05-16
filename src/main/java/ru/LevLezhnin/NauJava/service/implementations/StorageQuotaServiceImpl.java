@@ -5,12 +5,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.dto.storageQuotas.StorageQuotaResponseDto;
+import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.exceptions.StorageQuotaExceededException;
 import ru.LevLezhnin.NauJava.model.StorageQuota;
 import ru.LevLezhnin.NauJava.properties.QuotaProperties;
 import ru.LevLezhnin.NauJava.repository.jpa.StorageQuotaRepository;
 import ru.LevLezhnin.NauJava.service.base.AbstractStorageQuotaService;
+import ru.LevLezhnin.NauJava.utils.RequestContextService;
 
 @Service
 public class StorageQuotaServiceImpl extends AbstractStorageQuotaService {
@@ -18,35 +20,51 @@ public class StorageQuotaServiceImpl extends AbstractStorageQuotaService {
     private static final Logger log = LoggerFactory.getLogger(StorageQuotaServiceImpl.class);
 
     private final StorageQuotaRepository storageQuotaRepository;
+    private final RequestContextService requestContextService;
 
     @Autowired
-    public StorageQuotaServiceImpl(QuotaProperties quotaProperties, StorageQuotaRepository storageQuotaRepository) {
+    public StorageQuotaServiceImpl(QuotaProperties quotaProperties, StorageQuotaRepository storageQuotaRepository, RequestContextService requestContextService) {
         super(quotaProperties);
         this.storageQuotaRepository = storageQuotaRepository;
+        this.requestContextService = requestContextService;
     }
 
-    private StorageQuota getEntityById(Long storageQuotaId) {
-        return storageQuotaRepository.findById(storageQuotaId)
+    private StorageQuota getEntityByIdWithLock(Long storageQuotaId) {
+        return storageQuotaRepository.findForUpdateById(storageQuotaId)
                 .orElseThrow(() -> new EntityNotFoundException("Квота с id: %d не найдена".formatted(storageQuotaId)));
     }
 
     @Override
     @Transactional
-    public void updateStorageQuota(Long storageQuotaId, Long usedStorageBytes) {
-        StorageQuota storageQuota = getEntityById(storageQuotaId);
+    public void updateStorageQuota(Long storageQuotaId, long deltaBytes) {
+        StorageQuota storageQuota = getEntityByIdWithLock(storageQuotaId);
 
-        if (usedStorageBytes > storageQuota.getMaxStorageBytes()) {
-            log.warn("Превышение квоты хранилища. ID квоты: {}, Запрошено байт: {}, Лимит байт: {}", storageQuotaId, usedStorageBytes, storageQuota.getMaxStorageBytes());
-            throw new StorageQuotaExceededException("Превышен лимит хранилища: %d байт из %d".formatted(usedStorageBytes, storageQuota.getMaxStorageBytes()));
+        long currentUsedStorageBytes = storageQuota.getUsedStorageBytes();
+        long newUsedStorageBytes = currentUsedStorageBytes + deltaBytes;
+        long maxStorageBytes = storageQuota.getMaxStorageBytes();
+
+        if (newUsedStorageBytes < 0L) {
+            log.error("Попытка установить отрицательное значение заполненности. ID квоты: {}, Запрошено байт: {}, Лимит байт: {}, Заполнено байт: {}, Осталось байт: {}", storageQuotaId, deltaBytes, maxStorageBytes, currentUsedStorageBytes, maxStorageBytes - currentUsedStorageBytes);
+            newUsedStorageBytes = 0L;
         }
 
-        storageQuota.setUsedStorageBytes(usedStorageBytes);
+        if (maxStorageBytes < newUsedStorageBytes) {
+            log.warn("Превышение квоты хранилища. ID квоты: {}, Запрошено байт: {}, Лимит байт: {}, Осталось байт: {}", storageQuotaId, deltaBytes, maxStorageBytes, maxStorageBytes - currentUsedStorageBytes);
+            throw new StorageQuotaExceededException("Превышен лимит хранилища: %d байт из %d возможных".formatted(newUsedStorageBytes, maxStorageBytes));
+        }
+
+        storageQuota.setUsedStorageBytes(newUsedStorageBytes);
         storageQuotaRepository.save(storageQuota);
     }
 
     @Override
-    public StorageQuota getUserStorageQuota(Long userId) {
-        return storageQuotaRepository.findByUserId(userId)
+    public StorageQuotaResponseDto getCurrentUserStorageQuota() {
+        Long userId = requestContextService.getUserId();
+        StorageQuota storageQuota = storageQuotaRepository.findByUserId(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Квота для пользователя с id: " + userId + " не найдена"));
+        return new StorageQuotaResponseDto(
+                storageQuota.getUsedStorageBytes().toString(),
+                storageQuota.getMaxStorageBytes().toString()
+        );
     }
 }

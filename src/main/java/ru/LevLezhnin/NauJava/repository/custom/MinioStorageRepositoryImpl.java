@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.InvalidMimeTypeException;
 import org.springframework.util.MimeTypeUtils;
-import ru.LevLezhnin.NauJava.exceptions.FileStorageException;
+import ru.LevLezhnin.NauJava.exceptions.file.FileStorageException;
 
 import java.io.IOException;
 import java.io.InputStream;

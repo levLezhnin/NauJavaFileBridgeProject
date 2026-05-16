@@ -11,7 +11,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.LevLezhnin.NauJava.dto.file.*;
-import ru.LevLezhnin.NauJava.exceptions.*;
+import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
+import ru.LevLezhnin.NauJava.exceptions.file.*;
 import ru.LevLezhnin.NauJava.mapper.Mapper;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.custom.ObjectStorageRepository;
@@ -95,12 +97,7 @@ public class FileServiceImpl implements FileService {
         Instant expireAt = uploadedAt.plus(Duration.ofMinutes(fileUploadRequestDto.ttlMinutes()));
         String passwordHash = fileUploadRequestDto.password() != null ? passwordEncoder.encode(fileUploadRequestDto.password()) : null;
 
-        Long bytesRemaining = storageQuota.getBytesRemaining();
-
-        if (bytesRemaining < fileUploadRequestDto.fileSize()) {
-            log.warn("Превышена квота хранилища. ID пользователя: {}, Запрошено байт: {}, Доступно байт: {}", authorId, fileUploadRequestDto.fileSize(), bytesRemaining);
-            throw new FileTooLargeException("Размер файла превышает размер доступного для загрузки места");
-        }
+        storageQuotaService.updateStorageQuota(storageQuota.getId(), fileUploadRequestDto.fileSize());
 
         fileStorageRepository.uploadWithPath(
                 objectStorageFilePath,
@@ -130,7 +127,6 @@ public class FileServiceImpl implements FileService {
         try {
             fileStatisticsRepository.save(fileStatistics);
             fileRepository.save(file);
-            storageQuotaService.updateStorageQuota(storageQuota.getId(), storageQuota.getUsedStorageBytes() + fileUploadRequestDto.fileSize());
         } catch (Exception e) {
             log.error("Ошибка сохранения метаданных файла: ID файла: {}, ID пользователя: {}, Путь до файла: {}",
                 fileId, authorId, objectStorageFilePath, e);
@@ -251,7 +247,7 @@ public class FileServiceImpl implements FileService {
         fileRepository.deleteById(fileUuid);
 
         StorageQuota storageQuota = author.getStorageQuota();
-        storageQuotaService.updateStorageQuota(storageQuota.getId(), storageQuota.getUsedStorageBytes() - fileStatistics.getSizeBytes());
+        storageQuotaService.updateStorageQuota(storageQuota.getId(), -fileStatistics.getSizeBytes());
 
         log.info("Файл успешно удалён: ID файла: {}, ID пользователя, удалившего файл: {}, Освобождено байт: {}",
                 fileId, deleteRequestUserId, fileStatistics.getSizeBytes());

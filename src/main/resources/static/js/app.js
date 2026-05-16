@@ -1,5 +1,52 @@
 const publicPaths = ['/', '/login', '/register', '/forbidden'];
 
+function showValidationSummary(message, errors) {
+  const summary = document.querySelector('#validationSummary');
+  if (summary) {
+    summary.querySelector('.validation-summary__text').textContent = message;
+    const list = summary.querySelector('.validation-summary__list');
+    list.innerHTML = errors.map(error => `<li>${error}</li>`).join('');
+    summary.style.display = 'block';
+  }
+}
+
+function hideValidationSummary() {
+  const summary = document.querySelector('#validationSummary');
+  if (summary) {
+    summary.style.display = 'none';
+  }
+}
+
+function clearAllFieldErrors(form) {
+  form.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+  form.querySelectorAll('.field-error-message').forEach(el => el.remove());
+}
+
+function clearFieldError(fieldId) {
+  const field = document.querySelector(`#${fieldId}`);
+  if (field) {
+    field.classList.remove('field-error');
+    const errorMsg = field.parentElement.querySelector('.field-error-message');
+    if (errorMsg) errorMsg.remove();
+  }
+}
+
+function showFieldError(fieldId, message) {
+  const field = document.querySelector(`#${fieldId}`);
+  if (field) {
+    field.classList.add('field-error');
+    let existingMsg = field.parentElement.querySelector('.field-error-message');
+    if (existingMsg) {
+      existingMsg.textContent = existingMsg.textContent + '; ' + message;
+    } else {
+      const errorMsg = document.createElement('p');
+      errorMsg.className = 'field-error-message';
+      errorMsg.textContent = message;
+      field.parentElement.appendChild(errorMsg);
+    }
+  }
+}
+
 function showAlert(message, type = 'info') {
   const container = document.querySelector('#alertContainer');
   if (!container) return;
@@ -13,23 +60,99 @@ function showAlert(message, type = 'info') {
   }, 6000);
 }
 
-function apiFetch(path, options = {}) {
-  options.headers = options.headers || {};
-  options.headers['Accept'] = 'application/json';
-  if (!(options.body instanceof FormData)) {
-    options.headers['Content-Type'] = 'application/json';
+let refreshPromise = null;
+let redirectInProgress = false;
+
+function redirectToLogin() {
+  if (redirectInProgress) return;
+  redirectInProgress = true;
+  window.location.href = '/login';
+}
+
+async function refreshAccessToken() {
+  if (refreshPromise) {
+    return refreshPromise;
   }
-  options.credentials = options.credentials || 'same-origin';
-  return fetch(path, options).then(async response => {
-    if (response.status === 401) {
-      window.location.href = '/login';
-      return Promise.reject(new Error('Unauthorized'));
+
+  refreshPromise = fetch('/api/v1/auth/refresh', {
+    method: 'POST',
+    headers: { 'Accept': 'application/json' },
+    credentials: 'same-origin'
+  }).then(response => {
+    if (!response.ok) {
+      throw new Error('Refresh token expired');
     }
+    return true;
+  }).finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
+async function parseApiResponse(response) {
+  const contentType = response.headers.get('Content-Type') || '';
+  if (response.status === 204) {
+    return null;
+  }
+  if (contentType.includes('application/json')) {
+    return response.json().catch(() => null);
+  }
+  return response.text().catch(() => null);
+}
+
+async function performFetchWithRefresh(path, options = {}) {
+  const { skipRedirectOnAuthFail = false, ...fetchOptions } = options;
+  fetchOptions.headers = fetchOptions.headers || {};
+  fetchOptions.headers['Accept'] = fetchOptions.headers['Accept'] || 'application/json';
+  if (!(fetchOptions.body instanceof FormData) && !fetchOptions.headers['Content-Type']) {
+    fetchOptions.headers['Content-Type'] = 'application/json';
+  }
+  fetchOptions.credentials = fetchOptions.credentials || 'same-origin';
+
+  const executeFetch = async () => {
+    const response = await fetch(path, fetchOptions);
+    if (response.status === 401 && path !== '/api/v1/auth/refresh') {
+      try {
+        await refreshAccessToken();
+      } catch (refreshError) {
+        if (!skipRedirectOnAuthFail) {
+          redirectToLogin();
+        }
+        throw new Error('Unauthorized');
+      }
+
+      const retryResponse = await fetch(path, fetchOptions);
+      if (retryResponse.status === 401) {
+        if (!skipRedirectOnAuthFail) {
+          redirectToLogin();
+        }
+        throw new Error('Unauthorized');
+      }
+      return retryResponse;
+    }
+    return response;
+  };
+
+  return executeFetch();
+}
+
+function apiFetch(path, options = {}) {
+  return performFetchWithRefresh(path, options).then(async response => {
     if (!response.ok) {
       const data = await response.json().catch(() => null);
-      return Promise.reject(new Error(data?.message || response.statusText));
+      if (response.status === 403 && data?.error === 'Ваш аккаунт заблокирован') {
+        window.location.href = '/forbidden';
+        return Promise.reject(new Error('Redirecting to forbidden page'));
+      }
+      const error = new Error(data?.message || response.statusText);
+      if (data?.fieldErrors && Array.isArray(data.fieldErrors)) {
+        error.details = data.fieldErrors.map(e => e.message).join(', ');
+      }
+      return Promise.reject(error);
     }
-    return response.json().catch(() => null);
+
+    return parseApiResponse(response);
   });
 }
 
@@ -46,15 +169,7 @@ function isPublicPage() {
   return publicPaths.includes(window.location.pathname);
 }
 
-function checkAuthStatus() {
-  return fetch('/api/v1/users/me', {
-    method: 'GET',
-    headers: { 'Accept': 'application/json' },
-    credentials: 'same-origin'
-  }).then(response => response.ok).catch(() => false);
-}
-
-function initNavbar() {
+async function initNavbar() {
   updateNavbar(false, false);
   const logout = document.querySelector('#logoutButton');
   if (logout) {
@@ -68,21 +183,89 @@ function initNavbar() {
     });
   }
 
-  if (isPublicPage()) {
+  if (window.location.pathname === '/forbidden') {
+    updateNavbar(true, false);
     return;
   }
 
-  apiFetch('/api/v1/users/me', { method: 'GET' })
-    .then(data => {
-      const isAdmin = data?.role === 'ADMIN';
-      updateNavbar(true, isAdmin);
+  try {
+    const user = await apiFetch('/api/v1/users/me', { method: 'GET', skipRedirectOnAuthFail: true });
+    const isAdmin = user?.role === 'ADMIN';
+    updateNavbar(true, isAdmin);
+
+    if ((window.location.pathname === '/login' || window.location.pathname === '/register') && user) {
+      window.location.href = '/files';
+    }
+  } catch (error) {
+    updateNavbar(false, false);
+    if (!isPublicPage()) {
+      window.location.href = '/login';
+    }
+  }
+}
+
+function validateUpdateProfileForm(newUsername, currentPassword, newPassword, confirmNewPassword) {
+  const errors = [];
+
+  // At least one field should be provided
+  if ((!newUsername || newUsername.trim().length === 0) &&
+      (!newPassword || newPassword.trim().length === 0)) {
+    errors.push('Укажите хотя бы новый логин или новый пароль');
+  }
+
+  // Username validation: 5-255 chars, letters (including Cyrillic), digits, dots, dashes, underscores
+  if (newUsername && newUsername.trim().length > 0) {
+    if (newUsername.length < 5 || newUsername.length > 255) {
+      errors.push('Имя пользователя должно иметь длину от 5 до 255 символов');
+    } else if (!/^[a-zA-Zа-яА-ЯЁё\d\-_\.]+$/.test(newUsername)) {
+      errors.push('Имя пользователя должно содержать только буквы, цифры, точки, тире и нижние подчёркивания');
+    }
+  }
+
+  // If changing password, current password is required
+  if (newPassword && newPassword.trim().length > 0) {
+    if (!currentPassword || currentPassword.trim().length === 0) {
+      errors.push('Для смены пароля укажите текущий пароль');
+    }
+
+    // Password validation: 8-255 chars, at least one lowercase, one uppercase, one digit, one special char
+    if (newPassword.length < 8 || newPassword.length > 255) {
+      errors.push('Длина пароля должна быть от 8 до 255 символов');
+    } else if (!/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[?!@#$%^&*()+_\-])/.test(newPassword)) {
+      errors.push('Пароль должен содержать латинские буквы верхнего и нижнего регистров, цифру и специальный символ');
+    }
+
+    // Confirm password
+    if (!confirmNewPassword || confirmNewPassword.trim().length === 0) {
+      errors.push('Подтвердите новый пароль');
+    } else if (newPassword !== confirmNewPassword) {
+      errors.push('Пароли не совпадают');
+    }
+  }
+
+  return errors;
+}
+
+function loadQuotaData() {
+  return apiFetch('/api/v1/quotas/my', { method: 'GET' })
+    .then(quotaData => {
+      return quotaData;
     })
     .catch(() => {
-      updateNavbar(false, false);
-      if (!isPublicPage()) {
-        window.location.href = '/login';
-      }
+      return null;
     });
+}
+
+function formatQuotaDisplay(quotaData) {
+  if (!quotaData) return 'Нет информации о квоте.';
+
+  const usedBytes = parseInt(quotaData.used_storage_bytes) || 0;
+  const maxBytes = parseInt(quotaData.max_storage_bytes) || 0;
+
+  const usedFormatted = formatBytes(usedBytes);
+  const maxFormatted = formatBytes(maxBytes);
+
+  return `${usedFormatted} из ${maxFormatted}`;
 }
 
 function initProfileData() {
@@ -91,23 +274,165 @@ function initProfileData() {
   if (!usernameNode && !quotaNode) {
     return;
   }
+
+  // Load user data
   apiFetch('/api/v1/users/me', { method: 'GET' })
     .then(data => {
       if (usernameNode) {
         usernameNode.textContent = data?.username || data?.email || 'Неизвестный пользователь';
-      }
-      if (quotaNode) {
-        quotaNode.textContent = data ? 'Квотные данные загружены.' : 'Нет информации о квоте.';
       }
     })
     .catch(() => {
       if (usernameNode) {
         usernameNode.textContent = 'Гость';
       }
-      if (quotaNode) {
-        quotaNode.textContent = 'Нет информации о квоте.';
+    });
+
+  // Load quota data
+  if (quotaNode) {
+    loadQuotaData().then(quotaData => {
+      quotaNode.textContent = formatQuotaDisplay(quotaData);
+    });
+  }
+}
+
+function initProfileUpdateForm() {
+  const updateProfileForm = document.querySelector('#updateProfileForm');
+  if (!updateProfileForm) return;
+
+  // Clear errors when user starts typing
+  updateProfileForm.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', () => {
+      clearFieldError(input.id);
+      hideValidationSummary();
+    });
+  });
+
+  // Delete account functionality
+  const deleteAccountBtn = document.querySelector('#deleteAccountBtn');
+  if (deleteAccountBtn) {
+    deleteAccountBtn.addEventListener('click', async () => {
+      const confirmed = confirm(
+        'Вы уверены, что хотите удалить аккаунт?\n\nЭто действие нельзя будет отменить. Все ваши файлы будут удалены, и вы потеряете доступ к системе.'
+      );
+
+      if (!confirmed) return;
+
+      deleteAccountBtn.disabled = true;
+      const originalText = deleteAccountBtn.textContent;
+      deleteAccountBtn.textContent = 'Удаление...';
+
+      try {
+        await apiFetch('/api/v1/users/me', { method: 'DELETE' });
+        showAlert('Аккаунт успешно удалён', 'success');
+
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } catch (error) {
+        showAlert(error.message || 'Ошибка удаления аккаунта', 'error');
+        deleteAccountBtn.disabled = false;
+        deleteAccountBtn.textContent = originalText;
       }
     });
+  }
+
+  updateProfileForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const newUsername = document.querySelector('#newUsername').value.trim();
+    const currentPassword = document.querySelector('#currentPassword').value;
+    const newPassword = document.querySelector('#newPassword').value;
+    const confirmNewPassword = document.querySelector('#confirmNewPassword').value;
+
+    hideValidationSummary();
+    clearAllFieldErrors(updateProfileForm);
+
+    // Client-side validation
+    const errors = validateUpdateProfileForm(newUsername, currentPassword, newPassword, confirmNewPassword);
+    if (errors.length > 0) {
+      showValidationSummary('Пожалуйста, исправьте ошибки в форме', errors);
+      // Highlight specific fields
+      if (newUsername && (newUsername.length < 5 || newUsername.length > 255 || !/^[a-zA-Zа-яА-ЯЁё\d\-_\.]+$/.test(newUsername))) {
+        showFieldError('newUsername', 'Имя пользователя должно иметь длину от 5 до 255 символов и содержать только буквы верхнего и нижнего регистров, цифры, точки, тире и нижние подчёркивания');
+      }
+      if (newPassword && (newPassword.length < 8 || newPassword.length > 255 || !/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[?!@#$%^&*()+_\-])/.test(newPassword))) {
+        showFieldError('newPassword', 'Пароль должен содержать латинские буквы верхнего и нижнего регистров, цифру и специальный символ');
+      }
+      if (newPassword && (!confirmNewPassword || newPassword !== confirmNewPassword)) {
+        showFieldError('confirmNewPassword', 'Пароли не совпадают');
+      }
+      if (newPassword && (!currentPassword || currentPassword.trim().length === 0)) {
+        showFieldError('currentPassword', 'Для смены пароля укажите текущий пароль');
+      }
+      return;
+    }
+
+    const button = updateProfileForm.querySelector('button[type="submit"]');
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '⏳ Обновление...';
+
+    try {
+      const payload = {};
+      if (newUsername) payload.new_username = newUsername;
+      if (currentPassword) payload.current_password = currentPassword;
+      if (newPassword) payload.new_password = newPassword;
+      if (confirmNewPassword) payload.confirm_new_password = confirmNewPassword;
+
+      await apiFetch('/api/v1/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+
+      showAlert('Профиль успешно обновлён!', 'success');
+
+      // Clear form
+      document.querySelector('#newUsername').value = '';
+      document.querySelector('#currentPassword').value = '';
+      document.querySelector('#newPassword').value = '';
+      document.querySelector('#confirmNewPassword').value = '';
+
+      // Refresh profile data
+      initProfileData();
+
+    } catch (error) {
+      // Handle field-specific errors from server
+      if (error && error.fieldErrors && Array.isArray(error.fieldErrors)) {
+        clearAllFieldErrors(updateProfileForm);
+        const fieldErrorsMap = {};
+        error.fieldErrors.forEach(fieldError => {
+          const fieldName = fieldError.field;
+          const message = fieldError.message;
+          const fieldIdMap = {
+            'newUsername': 'newUsername',
+            'currentPassword': 'currentPassword',
+            'newPassword': 'newPassword',
+            'confirmNewPassword': 'confirmNewPassword'
+          };
+          const elementId = fieldIdMap[fieldName] || fieldName;
+          if (!fieldErrorsMap[elementId]) {
+            fieldErrorsMap[elementId] = [];
+          }
+          fieldErrorsMap[elementId].push(message);
+        });
+
+        // Show field-specific errors
+        Object.entries(fieldErrorsMap).forEach(([fieldId, messages]) => {
+          showFieldError(fieldId, messages.join(' '));
+        });
+
+        // Show general summary
+        showValidationSummary('Пожалуйста, исправьте ошибки в форме', Object.values(fieldErrorsMap).flat());
+      } else {
+        showAlert(error.message || 'Ошибка обновления профиля', 'error');
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  });
 }
 
 function sleep(ms) {
@@ -147,9 +472,8 @@ function initReportPage() {
 
     while (true) {
       try {
-        const response = await fetch(`/api/v1/report/${id}`, {
+        const response = await performFetchWithRefresh(`/api/v1/report/${id}`, {
           method: 'GET',
-          credentials: 'same-origin',
           headers: { Accept: 'text/plain' }
         });
 
@@ -226,6 +550,7 @@ function initReportPage() {
 document.addEventListener('DOMContentLoaded', () => {
   initNavbar();
   initProfileData();
+  initProfileUpdateForm();
   initReportPage();
 });
 
@@ -240,11 +565,17 @@ function formatDate(isoString) {
 }
 
 function formatBytes(bytes) {
-  if (!bytes) return '0 B';
+  if (!bytes) return '0 Б';
   const k = 1024;
-  const sizes = ['B', 'КБ', 'МБ', 'ГБ'];
+  const sizes = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+}
+
+function formatFilesCount(count) {
+  if (count % 10 === 1 && count % 100 !== 11) return `${count} файл`;
+  if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) return `${count} файла`;
+  return `${count} файлов`;
 }
 
 function getFileStatus(file) {
@@ -312,14 +643,17 @@ async function loadFiles() {
   const filesList = document.querySelector('#filesList');
   const quotaInfo = document.querySelector('#quotaInfo');
   const quotaMeta = document.querySelector('.quota-meta');
-  
+
   if (!filesList) return;
 
   filesList.innerHTML = '<div class="empty-state"><p class="empty-title">Загрузка файлов...</p></div>';
 
   try {
-    const files = await apiFetch('/api/v1/files/my?page=0&page_size=100');
-    
+    const [files, quotaData] = await Promise.all([
+      apiFetch('/api/v1/files/my?page=0&page_size=100'),
+      loadQuotaData()
+    ]);
+
     if (!files || files.length === 0) {
       filesList.innerHTML = `
         <div class="empty-state">
@@ -328,35 +662,48 @@ async function loadFiles() {
           <a href="/upload" class="btn btn-secondary">Загрузить файл</a>
         </div>
       `;
-      return;
+    } else {
+      filesList.innerHTML = '';
+      files.forEach(file => {
+        const card = createFileCard(file);
+        filesList.appendChild(card);
+      });
+
+      // Attach event listeners
+      document.querySelectorAll('.copy-link-btn').forEach(btn => {
+        btn.addEventListener('click', handleCopyLink);
+      });
+      document.querySelectorAll('.delete-file-btn').forEach(btn => {
+        btn.addEventListener('click', handleDeleteFile);
+      });
     }
 
-    filesList.innerHTML = '';
-    files.forEach(file => {
-      const card = createFileCard(file);
-      filesList.appendChild(card);
-    });
+    // Update quota information
+    if (quotaData) {
+      const usedBytes = parseInt(quotaData.used_storage_bytes) || 0;
+      const maxBytes = parseInt(quotaData.max_storage_bytes) || 0;
+      const quotaUsed = document.querySelector('#quotaUsed');
+      const quotaTotal = document.querySelector('#quotaTotal');
+      if (quotaUsed) quotaUsed.textContent = formatBytes(usedBytes);
+      if (quotaTotal) quotaTotal.textContent = formatBytes(maxBytes);
+    } else {
+      const quotaUsed = document.querySelector('#quotaUsed');
+      const quotaTotal = document.querySelector('#quotaTotal');
+      if (quotaUsed) quotaUsed.textContent = '0';
+      if (quotaTotal) quotaTotal.textContent = '0';
+    }
 
-    // Attach event listeners
-    document.querySelectorAll('.copy-link-btn').forEach(btn => {
-      btn.addEventListener('click', handleCopyLink);
-    });
-    document.querySelectorAll('.delete-file-btn').forEach(btn => {
-      btn.addEventListener('click', handleDeleteFile);
-    });
-
-    if (quotaMeta) {
-      quotaMeta.innerHTML = `
-        <span id="quotaFiles">${files.length} файлов</span>
-      `;
+    const quotaFiles = document.querySelector('#quotaFiles');
+    if (quotaFiles) {
+      quotaFiles.textContent = formatFilesCount(files ? files.length : 0);
     }
   } catch (error) {
-    showAlert(error.message || 'Ошибка загрузки файлов', 'error');
+    showAlert(error.message || 'Ошибка загрузки данных', 'error');
     filesList.innerHTML = `
       <div class="empty-state">
         <p class="empty-title">Ошибка загрузки</p>
         <p class="empty-text">${escapeHtml(error.message)}</p>
-        <button class="btn btn-secondary" onclick="loadFiles()">Попробовать снова</button>
+        <button class="btn btn-secondary" onclick="(async () => { try { await loadFiles(); } catch(e) { console.error(e); } })()">Попробовать снова</button>
       </div>
     `;
   }
@@ -365,7 +712,7 @@ async function loadFiles() {
 function updateFileCount(count) {
   const quotaFiles = document.querySelector('#quotaFiles');
   if (quotaFiles) {
-    quotaFiles.textContent = `${count} файлов`;
+    quotaFiles.textContent = formatFilesCount(count);
   }
 }
 
@@ -437,10 +784,14 @@ async function handleDeleteFile(event) {
   }
 }
 
-function initFilesPage() {
+async function initFilesPage() {
   const filesList = document.querySelector('#filesList');
   if (!filesList) return;
-  loadFiles();
+  try {
+    await loadFiles();
+  } catch (error) {
+    console.error('Error loading files page:', error);
+  }
 }
 
 // ============================================
@@ -615,99 +966,41 @@ function initUploadPage() {
       })], { type: 'application/json' });
       formData.append('payload', payloadBlob);
 
-      // Create XMLHttpRequest for progress tracking
-      const xhr = new XMLHttpRequest();
       const progressContainer = uploadForm.querySelector('.progress-container') || createProgressBar(uploadForm);
+      button.textContent = '⏳ Загрузка...';
+      progressContainer.querySelector('.progress-bar').style.width = '15%';
+      progressContainer.querySelector('.progress-text').textContent = 'Начинаем загрузку...';
 
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const percentComplete = (e.loaded / e.total) * 100;
-          const progressBar = progressContainer.querySelector('.progress-bar');
-          const progressText = progressContainer.querySelector('.progress-text');
-          progressBar.style.width = percentComplete + '%';
-          progressText.textContent = `${Math.round(percentComplete)}%`;
-        }
-      });
+      try {
+        await apiFetch('/api/v1/files', {
+          method: 'POST',
+          body: formData,
+          credentials: 'same-origin'
+        });
 
-       xhr.addEventListener('load', async () => {
-        if (xhr.status === 201 || xhr.status === 200) {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            showAlert('Файл успешно загружен!', 'success');
-            fileInput.value = '';
-            document.querySelector('#ttl').value = '1';
-            document.querySelector('#maxDownloads').value = '10';
-            document.querySelector('#password').value = '';
-            hideValidationSummary();
-            progressContainer.remove();
-            button.disabled = false;
-            button.textContent = originalText;
-            updateFileDisplay();
-            
-            // Redirect to files page
-            setTimeout(() => {
-              window.location.href = '/files';
-            }, 1500);
-          } catch (e) {
-            showAlert('Ошибка обработки ответа сервера', 'error');
-            button.disabled = false;
-            button.textContent = originalText;
-          }
-        } else {
-          try {
-            const error = JSON.parse(xhr.responseText);
-            // Check for validation errors (fieldErrors array)
-            if (error.fieldErrors && Array.isArray(error.fieldErrors)) {
-              clearAllFieldErrors(uploadForm);
-              const fieldErrorsMap = {};
-              error.fieldErrors.forEach(fieldError => {
-                const fieldName = fieldError.field;
-                const message = fieldError.message;
-                const fieldIdMap = {
-                  'fileName': 'dropzone',
-                  'fileSize': 'dropzone',
-                  'contentType': 'dropzone',
-                  'ttlMinutes': 'ttl',
-                  'maxDownloads': 'maxDownloads',
-                  'password': 'password'
-                };
-                const elementId = fieldIdMap[fieldName] || fieldName;
-                if (!fieldErrorsMap[elementId]) {
-                  fieldErrorsMap[elementId] = [];
-                }
-                fieldErrorsMap[elementId].push(message);
-              });
-              
-               // Show field-specific errors
-               Object.entries(fieldErrorsMap).forEach(([fieldId, messages]) => {
-                 showFieldError(fieldId, messages.join('; '));
-               });
-               
-               // Show general summary
-               showValidationSummary('Пожалуйста, исправьте ошибки в форме');
-            } else {
-              showAlert(error.message || xhr.statusText || 'Ошибка загрузки файла', 'error');
-            }
-          } catch {
-            showAlert('Ошибка загрузки файла: ' + xhr.statusText, 'error');
-          }
-          button.disabled = false;
-          button.textContent = originalText;
-        }
-       });
-
-       xhr.addEventListener('error', () => {
-        showAlert('Ошибка сети при загрузке файла', 'error');
+        showAlert('Файл успешно загружен!', 'success');
+        fileInput.value = '';
+        document.querySelector('#ttl').value = '1';
+        document.querySelector('#maxDownloads').value = '10';
+        document.querySelector('#password').value = '';
+        hideValidationSummary();
+        progressContainer.querySelector('.progress-bar').style.width = '100%';
+        progressContainer.querySelector('.progress-text').textContent = 'Загрузка завершена';
         button.disabled = false;
         button.textContent = originalText;
-      });
+        updateFileDisplay();
 
-      xhr.open('POST', '/api/v1/files');
-      xhr.setRequestHeader('Accept', 'application/json');
-      xhr.withCredentials = true;
-      
-      button.textContent = '⏳ Загрузка...';
-      xhr.send(formData);
+        setTimeout(() => {
+          window.location.href = '/files';
+        }, 1500);
+      } catch (error) {
+        const message = error.details || error.message || 'Ошибка загрузки файла';
+        showAlert(message, 'error');
+        button.disabled = false;
+        button.textContent = originalText;
+        progressContainer.remove();
+      }
+
     } catch (error) {
       showAlert(error.message || 'Ошибка при подготовке к загрузке', 'error');
       button.disabled = false;
@@ -750,13 +1043,12 @@ function initDownloadPage() {
 
     try {
       // Single fetch request to download file as blob
-      const fetchResponse = await fetch('/api/v1/files/download', {
+      const fetchResponse = await performFetchWithRefresh('/api/v1/files/download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/octet-stream'
         },
-        credentials: 'same-origin',
         body: JSON.stringify({
           file_id: fileId,
           password: password
@@ -810,11 +1102,11 @@ function initDownloadPage() {
 // Page Initialization
 // ============================================
 
-document.addEventListener('DOMContentLoaded', () => {
-  initNavbar();
+document.addEventListener('DOMContentLoaded', async () => {
+  await initNavbar();
   initProfileData();
   initReportPage();
-  initFilesPage();
+  await initFilesPage();
   initUploadPage();
   initDownloadPage();
 });

@@ -16,17 +16,46 @@
             <p>Управляйте данными профиля и следите за квотой.</p>
         </div>
         <div class="profile-grid">
-            <div class="profile-item">
+            <div class="profile-item profile-info">
                 <h2>Имя пользователя</h2>
-                <p id="profileUsername">Загрузка данных...</p>
+                <p class="profile-value" id="profileUsername">Загрузка данных...</p>
             </div>
-            <div class="profile-item">
+            <div class="profile-item profile-info">
                 <h2>Квота</h2>
-                <p id="profileQuota">Доступные данные появятся здесь после авторизации.</p>
+                <p class="profile-value" id="profileQuota">Доступные данные появятся здесь после авторизации.</p>
             </div>
             <div class="profile-item">
-                <h2>Сброс пароля</h2>
-                <p>Функция обновления пароля будет доступна после подключения серверного API.</p>
+                <h2>Изменить данные аккаунта</h2>
+                <div th:replace="~{fragments/alerts :: alerts}"></div>
+                <div id="validationSummary" class="validation-summary" style="display: none;" role="alert" aria-live="assertive">
+                  <p class="validation-summary__text"></p>
+                  <ul class="validation-summary__list"></ul>
+                </div>
+                <form id="updateProfileForm" class="form-card" novalidate>
+                    <div class="form-group">
+                        <label for="newUsername">Новый логин (необязательно)</label>
+                        <input id="newUsername" name="newUsername" type="text" autocomplete="username" placeholder="Оставьте пустым, если не хотите менять" style="background: #ffffff;" />
+                    </div>
+                    <div class="form-group">
+                        <label for="currentPassword">Текущий пароль</label>
+                        <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" placeholder="Требуется для смены пароля" style="background: #ffffff;" />
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">Новый пароль (необязательно)</label>
+                        <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" placeholder="Оставьте пустым, если не хотите менять" style="background: #ffffff;" />
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmNewPassword">Подтверждение нового пароля</label>
+                        <input id="confirmNewPassword" name="confirmNewPassword" type="password" autocomplete="new-password" placeholder="Повторите новый пароль" style="background: #ffffff;" />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Обновить профиль</button>
+                    <p class="form-note">💡 Укажите хотя бы новый логин или новый пароль для обновления данных.</p>
+                </form>
+            </div>
+            <div class="profile-item profile-item-danger">
+                <h2>Опасная зона</h2>
+                <p>Действия ниже необратимы. Будьте осторожны.</p>
+                <button id="deleteAccountBtn" class="btn btn-danger">Удалить аккаунт</button>
             </div>
         </div>
     </section>

@@ -51,6 +51,13 @@ app:
       BASIC:
         maxStorageSize: 1GB
 
+  default:
+    default-admin:
+      username: ${DEFAULT_ADMIN_USERNAME}
+      email: ${DEFAULT_ADMIN_EMAIL}
+      password: ${DEFAULT_ADMIN_PASSWORD}
+      quota-size: ${DEFAULT_ADMIN_QUOTA_SIZE}
+
 jwt:
   accessSecret: ${ACCESS_JWT_SECRET}
   refreshSecret: ${REFRESH_JWT_SECRET}

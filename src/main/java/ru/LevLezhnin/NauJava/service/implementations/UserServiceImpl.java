@@ -2,9 +2,11 @@ package ru.LevLezhnin.NauJava.service.implementations;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -14,8 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
 import ru.LevLezhnin.NauJava.dto.user.UpdateUserRequestDto;
+import ru.LevLezhnin.NauJava.dto.user.UserProfileAdminResponseDto;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
-import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exceptions.InvalidSearchCriteriaException;
+import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
+import ru.LevLezhnin.NauJava.exceptions.user.EmailTakenException;
+import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exceptions.user.InvalidLoginException;
+import ru.LevLezhnin.NauJava.exceptions.user.UsernameTakenException;
 import ru.LevLezhnin.NauJava.model.File;
 import ru.LevLezhnin.NauJava.model.QuotaTariffs;
 import ru.LevLezhnin.NauJava.model.StorageQuota;
@@ -46,16 +54,9 @@ public class UserServiceImpl implements UserService {
         this.storageQuotaService = storageQuotaService;
     }
 
-    private void checkUsernameUnique(String username) {
-        if (userRepository.findByUsername(username).isPresent()) {
-            throw new IllegalArgumentException("Пользователь с логином '%s' уже существует".formatted(username));
-        }
-    }
-
-    private void checkEmailUnique(String email) {
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new IllegalArgumentException("Пользователь с E-mail-ом '%s' уже существует".formatted(email));
-        }
+    private User findById(long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь с id: %d не найден".formatted(id)));
     }
 
     private User getUserByAuthentication() {
@@ -63,12 +64,22 @@ public class UserServiceImpl implements UserService {
         return findById(userId);
     }
 
+    private void checkUsernameUnique(String username) {
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new UsernameTakenException("Пользователь с логином '%s' уже существует".formatted(username));
+        }
+    }
+
+    private void checkEmailUnique(String email) {
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new EmailTakenException("Пользователь с E-mail-ом '%s' уже существует".formatted(email));
+        }
+    }
+
     @Override
     @Transactional
-    public User createUser(RegistrationRequestDto registrationRequestDto) {
-        if (!registrationRequestDto.validate()) {
-            throw new IllegalArgumentException("Для нового пользователя должны быть заполнены поля: логин, email, пароль");
-        }
+    public UserProfileResponseDto createUser(RegistrationRequestDto registrationRequestDto) {
+
         checkUsernameUnique(registrationRequestDto.username());
         checkEmailUnique(registrationRequestDto.email());
 
@@ -83,28 +94,20 @@ public class UserServiceImpl implements UserService {
                 .setStorageQuota(storageQuota)
                 .build();
 
-        return userRepository.save(user);
-    }
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            checkUsernameUnique(user.getUsername());
+            checkEmailUnique(user.getEmail());
+            throw e;
+        }
 
-    @Override
-    @Transactional(readOnly = true)
-    public User findById(long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Пользователь с id: %d не найден".formatted(id)));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User findByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new EntityNotFoundException("Пользователь с логином: '%s' не найден".formatted(username)));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("Пользователь с логином: '%s' не найден".formatted(email)));
+        return new UserProfileResponseDto(
+                user.getUsername(),
+                user.getEmail(),
+                user.getRegisteredAt(),
+                user.getRole() != null ? user.getRole().name() : null
+        );
     }
 
     @Override
@@ -122,22 +125,25 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void updateUser(UpdateUserRequestDto updateUserRequestDto) {
-        if (!updateUserRequestDto.validate()) {
-            throw new IllegalArgumentException("При обновлении пользователя должно быть заполнено хотя бы одно из двух: логин, пароль");
-        }
 
         User user = getUserByAuthentication();
 
-        if (updateUserRequestDto.containsUsername()) {
-            checkUsernameUnique(updateUserRequestDto.username());
-            user.setUsername(updateUserRequestDto.username());
+        if (updateUserRequestDto.containsNewUsername()) {
+            if (user.getUsername().equals(updateUserRequestDto.newUsername())) {
+                throw new InvalidLoginException("Новый логин должен отличаться от старого");
+            }
+            checkUsernameUnique(updateUserRequestDto.newUsername());
+            user.setUsername(updateUserRequestDto.newUsername());
         }
 
-        if (updateUserRequestDto.containsPassword()) {
-            if (passwordEncryptor.matches(updateUserRequestDto.password(), user.getPasswordHash())) {
-                throw new IllegalArgumentException("Новый пароль должен отличаться от старого");
+        if (updateUserRequestDto.containsNewPassword()) {
+            if (passwordEncryptor.matches(updateUserRequestDto.newPassword(), user.getPasswordHash())) {
+                throw new InvalidPasswordException("Новый пароль должен отличаться от старого");
             }
-            user.setPasswordHash(passwordEncryptor.encode(updateUserRequestDto.password()));
+            if (!passwordEncryptor.matches(updateUserRequestDto.currentPassword(), user.getPasswordHash())) {
+                throw new InvalidPasswordException("Указан неверный текущий пароль");
+            }
+            user.setPasswordHash(passwordEncryptor.encode(updateUserRequestDto.newPassword()));
         }
 
         userRepository.save(user);
@@ -169,23 +175,28 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> findByCriteria(String searchBy, String searchValue, int page, int pageSize) {
+    public List<UserProfileAdminResponseDto> findByCriteria(String searchBy, String searchValue, int page, int pageSize) {
         Pageable pageable = PageRequest.of(page, pageSize);
-
-        if (searchValue == null || searchValue.isBlank()) {
-            return List.of();
-        }
 
         Specification<User> specification = Specification.unrestricted();
 
         UserSearchStrategy userSearchStrategy = userSearchStrategyMap.get(searchBy);
 
         if (userSearchStrategy == null) {
-            throw new IllegalArgumentException("Неверный параметр search_by: " + searchBy);
+            throw new InvalidSearchCriteriaException("Неверный параметр search_by: " + searchBy);
         }
 
         specification = specification.and(userSearchStrategy.getSpecification(searchValue));
 
-        return userRepository.findAll(specification, pageable).toList();
+        return userRepository.findAll(specification, pageable)
+                .map(user -> new UserProfileAdminResponseDto(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getEmail(),
+                        user.getRole() == null ? "" : user.getRole().name(),
+                        user.isActive(),
+                        user.getRegisteredAt()
+                ))
+                .toList();
     }
 }

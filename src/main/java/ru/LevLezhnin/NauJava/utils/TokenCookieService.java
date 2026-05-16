@@ -6,7 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
-import ru.LevLezhnin.NauJava.security.CookieProperties;
+import ru.LevLezhnin.NauJava.security.properties.CookieProperties;
 
 @Component
 public class TokenCookieService {

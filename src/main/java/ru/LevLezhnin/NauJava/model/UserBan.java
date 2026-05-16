@@ -120,6 +120,10 @@ public class UserBan {
         return Objects.hash(id);
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     public static class Builder {
         private Long id;
         private String reason;

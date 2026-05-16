@@ -1,10 +1,10 @@
 package ru.LevLezhnin.NauJava.dto.file;
 
 import jakarta.validation.constraints.Positive;
-import ru.LevLezhnin.NauJava.validation.ContentTypeValid;
-import ru.LevLezhnin.NauJava.validation.FileNameValid;
-import ru.LevLezhnin.NauJava.validation.FilePasswordValid;
-import ru.LevLezhnin.NauJava.validation.FileTTLMinutesValid;
+import ru.LevLezhnin.NauJava.validation.file.ContentTypeValid;
+import ru.LevLezhnin.NauJava.validation.file.FileNameValid;
+import ru.LevLezhnin.NauJava.validation.file.FilePasswordValid;
+import ru.LevLezhnin.NauJava.validation.file.FileTTLMinutesValid;
 
 /**
  * DTO для тела запроса на загрузку файла в систему

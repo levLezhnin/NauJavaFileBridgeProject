@@ -5,8 +5,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import ru.LevLezhnin.NauJava.dto.storageQuotas.StorageQuotaResponseDto;
 import ru.LevLezhnin.NauJava.model.StorageQuota;
 import ru.LevLezhnin.NauJava.repository.jpa.StorageQuotaRepository;
+import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
 
 import java.util.Optional;
 
@@ -14,15 +16,15 @@ import java.util.Optional;
 @RequestMapping("/api/v1/quotas")
 public class StorageQuotaController {
 
-    private final StorageQuotaRepository storageQuotaRepository;
+    private final StorageQuotaService storageQuotaService;
 
     @Autowired
-    public StorageQuotaController(StorageQuotaRepository storageQuotaRepository) {
-        this.storageQuotaRepository = storageQuotaRepository;
+    public StorageQuotaController(StorageQuotaService storageQuotaService) {
+        this.storageQuotaService = storageQuotaService;
     }
 
-    @GetMapping("/user/{userId}")
-    public Optional<StorageQuota> getStorageQuotaByUserId(@PathVariable("userId") Long userId) {
-        return storageQuotaRepository.findByUserId(userId);
+    @GetMapping("/my")
+    public StorageQuotaResponseDto getCurrentUserStorageQuota() {
+        return storageQuotaService.getCurrentUserStorageQuota();
     }
 }

@@ -13,14 +13,40 @@
         <div>
             <p class="eyebrow">403</p>
             <h1>Доступ запрещён</h1>
-            <p>У вас нет прав для просмотра этого ресурса. Если вы уверены, что должны иметь доступ, войдите заново.</p>
-            <div class="hero-actions">
-                <a th:href="@{/login}" class="btn btn-primary">Войти</a>
-                <a th:href="@{/}" class="btn btn-secondary">На главную</a>
-            </div>
+            <p id="forbiddenMessage" class="forbidden-description">У вас нет прав для просмотра этого ресурса.</p>
         </div>
     </section>
 </main>
 <script th:src="@{/js/app.js}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('ban') === 'true') {
+        const reason = urlParams.get('reason');
+        const bannedAt = urlParams.get('bannedAt');
+        const admin = urlParams.get('admin');
+        const messageEl = document.getElementById('forbiddenMessage');
+        messageEl.innerHTML = `
+            <div class="ban-info">
+                <p class="ban-title">Ваш аккаунт заблокирован</p>
+                <div class="ban-details">
+                    <div class="ban-detail">
+                        <span class="detail-label">Причина:</span>
+                        <span class="detail-value">${reason}</span>
+                    </div>
+                    <div class="ban-detail">
+                        <span class="detail-label">Дата блокировки:</span>
+                        <span class="detail-value">${new Date(bannedAt).toLocaleString()}</span>
+                    </div>
+                    <div class="ban-detail">
+                        <span class="detail-label">Администратор:</span>
+                        <span class="detail-value">${admin}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+});
+</script>
 </body>
 </html>

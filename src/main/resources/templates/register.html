@@ -16,6 +16,10 @@
             <p>Заполните форму, чтобы начать хранить и обмениваться файлами.</p>
         </div>
         <div th:replace="~{fragments/alerts :: alerts}"></div>
+        <div id="validationSummary" class="validation-summary" style="display: none;" role="alert" aria-live="assertive">
+          <p class="validation-summary__text"></p>
+          <ul class="validation-summary__list"></ul>
+        </div>
         <form id="registerForm" class="form-card" novalidate>
             <div class="form-group">
                 <label for="registerUsername">Имя пользователя</label>
@@ -30,7 +34,7 @@
                 <input id="registerPassword" name="password" type="password" required autocomplete="new-password" />
             </div>
             <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
-            <p class="form-note">Уже есть аккаунт? <a th:href="@{/login}">Войти</a></p>
+            <p class="form-note">Уже есть аккаунт? <a th:href="@{/login}" class="link">Войти</a></p>
         </form>
     </section>
 </main>

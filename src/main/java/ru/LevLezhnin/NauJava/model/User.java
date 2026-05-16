@@ -89,6 +89,14 @@ public class User {
         isActive = active;
     }
 
+    public void applyBan() {
+        this.isActive = false;
+    }
+
+    public void applyUnban() {
+        this.isActive = true;
+    }
+
     public UserRole getRole() {
         return role;
     }

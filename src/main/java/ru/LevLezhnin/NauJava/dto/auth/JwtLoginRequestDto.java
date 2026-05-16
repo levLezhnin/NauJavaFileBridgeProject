@@ -1,3 +1,9 @@
 package ru.LevLezhnin.NauJava.dto.auth;
 
-public record JwtLoginRequestDto(String username, String password){}
+import jakarta.validation.constraints.NotBlank;
+
+public record JwtLoginRequestDto(
+        @NotBlank(message = "Логин должен быть заполнен")
+        String username,
+        @NotBlank(message = "Пароль должен быть заполнен")
+        String password) {}

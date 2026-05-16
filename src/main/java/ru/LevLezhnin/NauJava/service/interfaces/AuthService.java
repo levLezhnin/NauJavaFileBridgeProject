@@ -1,12 +1,12 @@
 package ru.LevLezhnin.NauJava.service.interfaces;
 
-import ru.LevLezhnin.NauJava.dto.auth.JwtLoginRequestDto;
-import ru.LevLezhnin.NauJava.dto.auth.JwtRefreshRequestDto;
-import ru.LevLezhnin.NauJava.dto.auth.JwtResponseDto;
-import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import ru.LevLezhnin.NauJava.dto.auth.*;
 
 public interface AuthService {
     JwtResponseDto register(RegistrationRequestDto registrationRequestDto);
     JwtResponseDto login(JwtLoginRequestDto jwtLoginRequestDto);
     JwtResponseDto refresh(JwtRefreshRequestDto jwtRefreshRequestDto);
+    void logout(JwtLogoutRequestDto jwtLogoutRequestDto);
 }

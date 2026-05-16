@@ -8,12 +8,25 @@
 </head>
 <body>
 <div th:replace="~{fragments/navbar :: navbar}"></div>
-<main class="page-shell list-shell">
+<div th:replace="~{fragments/alerts :: alerts}"></div>
+<div th:replace="~{fragments/modal :: modal}"></div>
+<main class="page-shell list-shell full-width">
     <section class="list-header">
         <div>
             <p class="eyebrow">Пользователи</p>
             <h1>Список зарегистрированных пользователей</h1>
         </div>
+        <form id="searchForm" class="search-form">
+            <select id="searchBy" name="searchBy">
+                <option value="all">Все</option>
+                <option value="id">По ID</option>
+                <option value="username">По имени пользователя</option>
+                <option value="email">По email</option>
+                <option value="role">По роли</option>
+            </select>
+            <input type="text" id="searchValue" name="searchValue" placeholder="Введите значение для поиска" />
+            <button type="submit" class="btn btn-primary">Поиск</button>
+        </form>
     </section>
     <section class="table-card">
         <table>
@@ -22,18 +35,347 @@
                 <th>ID</th>
                 <th>Имя</th>
                 <th>Email</th>
+                <th>Роль</th>
+                <th>Статус</th>
+                <th>Действия</th>
             </tr>
             </thead>
-            <tbody>
-            <tr th:each="user : ${users}">
-                <td th:text="${user.id}"></td>
-                <td th:text="${user.username}"></td>
-                <td th:text="${user.email}"></td>
-            </tr>
+            <tbody id="usersTableBody">
             </tbody>
         </table>
+        <div class="pagination-controls">
+            <button id="prevBtn" class="btn btn-secondary" disabled>Предыдущая</button>
+            <span id="pageInfo">Страница 1</span>
+            <button id="nextBtn" class="btn btn-secondary">Следующая</button>
+        </div>
     </section>
 </main>
 <script th:src="@{/js/app.js}"></script>
+<script>
+let currentUserId = null;
+let currentPage = 0;
+let currentSearchBy = 'all';
+let currentSearch = '';
+const pageSize = 50;
+
+function loadUsers() {
+    apiFetch(`/api/v1/admin/users?searchBy=${currentSearchBy}&search=${encodeURIComponent(currentSearch)}&page_size=${pageSize}&page=${currentPage}`)
+        .then(users => {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            users.forEach(user => {
+                const statusText = user.is_active ? 'Активен' : 'Заблокирован';
+                const statusClass = user.is_active ? 'status-active' : 'status-banned';
+                const actionButton = user.is_active ? `<button class="btn btn-danger btn-sm" data-user-id="${user.id}" onclick="openBanModal(this)">Заблокировать</button>` : `<button class="btn btn-success btn-sm" data-user-id="${user.id}" onclick="unbanUser(this)">Разблокировать</button>`;
+                const historyButton = user.role === 'ADMIN' ? `<button class="btn btn-info btn-sm" onclick="openAdminBanHistoryModal(${user.id})">История выданных банов</button>` : '';
+                const row = document.createElement('tr');
+                row.innerHTML = '<td>' + user.id + '</td><td>' + user.username + '</td><td>' + user.email + '</td><td>' + user.role + '</td><td class="' + statusClass + '">' + statusText + '</td><td><button class="btn btn-secondary btn-sm" data-user-id="' + user.id + '" onclick="openBanHistoryModal(this)">История полученных банов</button>' + historyButton + actionButton + '</td>';
+                tbody.appendChild(row);
+            });
+            document.getElementById('prevBtn').disabled = currentPage === 0;
+            document.getElementById('nextBtn').disabled = users.length < pageSize;
+            document.getElementById('pageInfo').textContent = `Страница ${currentPage + 1}`;
+        })
+        .catch(error => {
+            showAlert('Ошибка загрузки пользователей: ' + error.message, 'error');
+        });
+}
+
+function openBanModal(button) {
+    currentUserId = button.getAttribute('data-user-id');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const modalConfirm = document.getElementById('modalConfirm');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalPanel = modalBackdrop.querySelector('.modal-panel');
+
+    modalTitle.textContent = 'Заблокировать пользователя';
+    modalPanel.classList.remove('modal-unban');
+    modalPanel.classList.add('modal-ban');
+    modalBody.innerHTML = `
+        <div id="modalError" class="alert alert--error" hidden></div>
+        <div class="form-group">
+            <label for="banReason" class="form-label">Причина блокировки</label>
+            <textarea id="banReason" class="form-control" rows="5" maxlength="500" placeholder="Введите причину блокировки"></textarea>
+        </div>
+    `;
+    modalConfirm.textContent = 'Заблокировать';
+    modalConfirm.onclick = submitBan;
+
+    const modalError = document.getElementById('modalError');
+    if (modalError) modalError.hidden = true;
+    modalBackdrop.hidden = false;
+}
+
+function submitBan() {
+    clearFieldError('banReason');
+    const reasonElement = document.getElementById('banReason');
+    const reason = reasonElement.value.trim();
+
+    let hasErrors = false;
+
+    if (!reason) {
+        showFieldError('banReason', 'Причина блокировки должна быть заполнена');
+        hasErrors = true;
+    } else if (reason.length < 20) {
+        showFieldError('banReason', 'Причина блокировки должна быть длины от 20 символов');
+        hasErrors = true;
+    } else if (reason.length > 500) {
+        showFieldError('banReason', 'Причина блокировки не должна превышать 500 символов');
+        hasErrors = true;
+    }
+
+    if (hasErrors) return;
+
+    apiFetch('/api/v1/admin/users/ban', {
+        method: 'POST',
+        body: JSON.stringify({
+            ban_user_id: parseInt(currentUserId),
+            reason: reason
+        })
+    })
+    .then(data => {
+        showAlert('Пользователь успешно заблокирован', 'success');
+        closeModal();
+        loadUsers();
+    })
+    .catch(error => {
+        let message = error.message || 'Ошибка при блокировке пользователя';
+        // If error has details, show them
+        if (error.details) {
+            message += ': ' + error.details;
+        }
+        const modalError = document.getElementById('modalError');
+        modalError.textContent = message;
+        modalError.hidden = false;
+    });
+}
+
+function unbanUser(button) {
+    const userId = button.getAttribute('data-user-id');
+    // First, fetch active ban info
+    apiFetch(`/api/v1/admin/users/ban/${userId}`, { method: 'GET' })
+    .then(banInfo => {
+        openUnbanModal(banInfo, userId);
+    })
+    .catch(error => {
+        showAlert('Не удалось получить информацию о бане: ' + error.message, 'error');
+    });
+}
+
+let banHistoryPage = 0;
+
+function openBanHistoryModal(button) {
+    const userId = button.getAttribute('data-user-id');
+    loadBanHistory(userId, banHistoryPage);
+}
+
+function loadBanHistory(userId, page) {
+    apiFetch(`/api/v1/admin/users/ban/history/${userId}?page=${page}&page_size=20`, { method: 'GET' })
+    .then(history => {
+        const modalPanel = document.getElementById('modalBackdrop').querySelector('.modal-panel');
+        modalPanel.classList.add('modal-history');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalConfirm = document.getElementById('modalConfirm');
+        modalTitle.textContent = 'История банов пользователя';
+        const tableRows = history.length > 0 ? history.map(ban => '<tr><td>' + new Date(ban.banned_at).toLocaleString() + '</td><td>' + (ban.unbanned_at ? new Date(ban.unbanned_at).toLocaleString() : 'Активен') + '</td><td>' + ban.reason + '</td><td>' + (ban.admin_username ? ban.admin_username + ' (ID=' + ban.admin_id + ')' : ban.admin_id) + '</td></tr>').join('') : '<tr><td colspan="4">История банов пуста</td></tr>';
+        const pagination = '<div class="modal-pagination"><button id="modalPrev" class="btn btn-secondary" ' + (page === 0 ? 'disabled' : '') + '>Предыдущая</button><span id="modalPageInfo">Страница ' + (page + 1) + '</span><button id="modalNext" class="btn btn-secondary" ' + (history.length < 20 ? 'disabled' : '') + '>Следующая</button></div>';
+        modalBody.innerHTML = '<div id="modalError" class="alert alert--error" hidden></div>' +
+            '<div class="ban-history-wrapper">' +
+            '<table class="ban-history-table">' +
+            '<thead>' +
+            '<tr>' +
+            '<th>Дата бана</th>' +
+            '<th>Дата разбана</th>' +
+            '<th>Причина</th>' +
+            '<th>Администратор</th>' +
+            '</tr>' +
+            '</thead>' +
+            '<tbody>' +
+            tableRows +
+            '</tbody>' +
+            '</table>' +
+            '</div>' +
+            pagination;
+        modalConfirm.style.display = 'none';
+        document.getElementById('modalCancel').style.display = 'none';
+        modalBackdrop.hidden = false;
+
+        // Add listeners
+        document.getElementById('modalPrev').addEventListener('click', () => {
+            if (page > 0) {
+                banHistoryPage--;
+                loadBanHistory(userId, banHistoryPage);
+            }
+        });
+        document.getElementById('modalNext').addEventListener('click', () => {
+            banHistoryPage++;
+            loadBanHistory(userId, banHistoryPage);
+        });
+    })
+    .catch(error => {
+        showAlert('Ошибка загрузки истории: ' + error.message, 'error');
+    });
+}
+
+let adminBanHistoryPage = 0;
+
+function openAdminBanHistoryModal(adminId) {
+    loadAdminBanHistory(adminId, adminBanHistoryPage);
+}
+
+function loadAdminBanHistory(adminId, page) {
+    apiFetch(`/api/v1/admin/users/ban/issuedBans/${adminId}?page=${page}&page_size=20`, { method: 'GET' })
+    .then(history => {
+        const modalPanel = document.getElementById('modalBackdrop').querySelector('.modal-panel');
+        modalPanel.classList.add('modal-history');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalConfirm = document.getElementById('modalConfirm');
+        modalTitle.textContent = 'История выданных банов';
+        const tableRows = history.length > 0 ? history.map(ban => '<tr><td>' + new Date(ban.banned_at).toLocaleString() + '</td><td>' + (ban.unbanned_at ? new Date(ban.unbanned_at).toLocaleString() : 'Активен') + '</td><td>' + ban.reason + '</td><td>' + (ban.banned_user_username ? ban.banned_user_username + ' (ID=' + ban.banned_user_id + ')' : ban.banned_user_id) + '</td></tr>').join('') : '<tr><td colspan="4">История банов пуста</td></tr>';
+        const pagination = '<div class="modal-pagination"><button id="modalPrev" class="btn btn-secondary" ' + (page === 0 ? 'disabled' : '') + '>Предыдущая</button><span id="modalPageInfo">Страница ' + (page + 1) + '</span><button id="modalNext" class="btn btn-secondary" ' + (history.length < 20 ? 'disabled' : '') + '>Следующая</button></div>';
+        modalBody.innerHTML = '<div id="modalError" class="alert alert--error" hidden></div>' +
+            '<div class="ban-history-wrapper">' +
+            '<table class="ban-history-table">' +
+            '<thead>' +
+            '<tr>' +
+            '<th>Дата бана</th>' +
+            '<th>Дата разбана</th>' +
+            '<th>Причина</th>' +
+            '<th>Пользователь</th>' +
+            '</tr>' +
+            '</thead>' +
+            '<tbody>' +
+            tableRows +
+            '</tbody>' +
+            '</table>' +
+            '</div>' +
+            pagination;
+        modalConfirm.style.display = 'none';
+        document.getElementById('modalCancel').style.display = 'none';
+        modalBackdrop.hidden = false;
+
+        // Add listeners
+        document.getElementById('modalPrev').addEventListener('click', () => {
+            if (page > 0) {
+                adminBanHistoryPage--;
+                loadAdminBanHistory(adminId, adminBanHistoryPage);
+            }
+        });
+        document.getElementById('modalNext').addEventListener('click', () => {
+            adminBanHistoryPage++;
+            loadAdminBanHistory(adminId, adminBanHistoryPage);
+        });
+    })
+    .catch(error => {
+        showAlert('Ошибка загрузки истории: ' + error.message, 'error');
+    });
+}
+
+function openUnbanModal(banInfo, userId) {
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const modalConfirm = document.getElementById('modalConfirm');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalPanel = document.getElementById('modalBackdrop').querySelector('.modal-panel');
+
+    modalPanel.classList.remove('modal-ban');
+    modalPanel.classList.add('modal-unban');
+    modalTitle.textContent = 'Разблокировать пользователя';
+    modalBody.innerHTML = `
+        <div id="modalError" class="alert alert--error" hidden></div>
+        <div class="ban-details-modal">
+            <div class="ban-detail-modal">
+                <span class="detail-label-modal">Причина бана:</span>
+                <span class="detail-value-modal">${banInfo.reason}</span>
+            </div>
+            <div class="ban-detail-modal">
+                <span class="detail-label-modal">Дата бана:</span>
+                <span class="detail-value-modal">${new Date(banInfo.banned_at).toLocaleString()}</span>
+            </div>
+            <div class="ban-detail-modal">
+                <span class="detail-label-modal">Администратор:</span>
+                <span class="detail-value-modal">${banInfo.admin_username ? banInfo.admin_username + ' (ID=' + banInfo.admin_id + ')' : banInfo.admin_id}</span>
+            </div>
+        </div>
+        <p class="confirm-text">Вы уверены, что хотите разблокировать этого пользователя?</p>
+    `;
+    modalConfirm.textContent = 'Разблокировать';
+    modalConfirm.onclick = () => submitUnban(userId);
+
+    const modalError = document.getElementById('modalError');
+    if (modalError) modalError.hidden = true;
+    modalBackdrop.hidden = false;
+}
+
+function submitUnban(userId) {
+    apiFetch(`/api/v1/admin/users/unban/${userId}`, {
+        method: 'POST'
+    })
+    .then(data => {
+        showAlert('Пользователь успешно разблокирован', 'success');
+        closeModal();
+        loadUsers();
+    })
+    .catch(error => {
+        const message = error.message || 'Ошибка при разблокировке пользователя';
+        const modalError = document.getElementById('modalError');
+        modalError.textContent = message;
+        modalError.hidden = false;
+    });
+}
+
+function closeModal() {
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalPanel = modalBackdrop.querySelector('.modal-panel');
+    modalPanel.classList.remove('modal-ban', 'modal-unban', 'modal-history');
+    const modalConfirm = document.getElementById('modalConfirm');
+    const modalCancel = document.getElementById('modalCancel');
+    modalConfirm.style.display = 'block';
+    modalCancel.style.display = 'block';
+    modalBackdrop.hidden = true;
+    currentUserId = null;
+    banHistoryPage = 0;
+    adminBanHistoryPage = 0;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsers();
+
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        currentSearchBy = document.getElementById('searchBy').value;
+        currentSearch = document.getElementById('searchValue').value.trim();
+        currentPage = 0;
+        loadUsers();
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+        if (currentPage > 0) {
+            currentPage--;
+            loadUsers();
+        }
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+        currentPage++;
+        loadUsers();
+    });
+
+    const modalClose = document.getElementById('modalClose');
+    const modalCancel = document.getElementById('modalCancel');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+
+    modalClose.addEventListener('click', closeModal);
+    modalCancel.addEventListener('click', closeModal);
+    modalBackdrop.addEventListener('click', function(e) {
+        if (e.target === modalBackdrop) {
+            closeModal();
+        }
+    });
+});
+</script>
 </body>
 </html>

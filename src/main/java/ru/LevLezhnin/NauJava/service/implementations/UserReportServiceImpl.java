@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
-import ru.LevLezhnin.NauJava.exceptions.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.model.Report;
 import ru.LevLezhnin.NauJava.model.ReportStatus;
 import ru.LevLezhnin.NauJava.model.User;

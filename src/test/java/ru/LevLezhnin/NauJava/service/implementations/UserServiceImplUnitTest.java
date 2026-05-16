@@ -12,6 +12,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
+import ru.LevLezhnin.NauJava.dto.user.UserProfileAdminResponseDto;
+import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
+import ru.LevLezhnin.NauJava.exceptions.InvalidSearchCriteriaException;
+import ru.LevLezhnin.NauJava.exceptions.user.EmailTakenException;
+import ru.LevLezhnin.NauJava.exceptions.user.UsernameTakenException;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
 import ru.LevLezhnin.NauJava.repository.user.search.UserSearchStrategy;
@@ -72,15 +77,13 @@ class UserServiceImplUnitTest {
         when(passwordEncoder.encode(rawPassword)).thenReturn(encodedPassword);
         when(userRepository.save(any(User.class))).thenAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
 
-        User result = userService.createUser(registrationRequestDto);
+        UserProfileResponseDto result = userService.createUser(registrationRequestDto);
 
         assertAll(
                 () -> assertNotNull(result, "Сохранённый пользователь пуст"),
-                () -> assertEquals(username, result.getUsername(), "Логин сохранённого пользователя не совпадает с тестовым"),
-                () -> assertEquals(email, result.getEmail(), "Email сохранённого пользователя не совпадает с тестовым"),
-                () -> assertEquals(encodedPassword, result.getPasswordHash(), "Хеш пароля сохранённого пользователя не совпадает с тестовым"),
-                () -> assertEquals(UserRole.USER, result.getRole(), "Роль сохранённого пользователя не совпала с ожидаемой"),
-                () -> assertTrue(result.isActive(), "Сохранённый пользователь не активен"),
+                () -> assertEquals(username, result.username(), "Логин сохранённого пользователя не совпадает с тестовым"),
+                () -> assertEquals(email, result.email(), "Email сохранённого пользователя не совпадает с тестовым"),
+                () -> assertEquals(UserRole.USER.name(), result.role(), "Роль сохранённого пользователя не совпала с ожидаемой"),
                 () -> verify(userRepository).save(any(User.class)),
                 () -> verify(storageQuotaService).getQuotaBuilder(QuotaTariffs.BASIC),
                 () -> verify(passwordEncoder).encode(rawPassword)
@@ -97,7 +100,7 @@ class UserServiceImplUnitTest {
 
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(new User()));
 
-        assertThrows(IllegalArgumentException.class, () -> userService.createUser(registrationRequestDto));
+        assertThrows(UsernameTakenException.class, () -> userService.createUser(registrationRequestDto));
     }
 
     @Test
@@ -110,7 +113,7 @@ class UserServiceImplUnitTest {
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(new User()));
 
-        assertThrows(IllegalArgumentException.class, () -> userService.createUser(registrationRequestDto));
+        assertThrows(EmailTakenException.class, () -> userService.createUser(registrationRequestDto));
     }
 
     @Test
@@ -125,16 +128,16 @@ class UserServiceImplUnitTest {
         when(userRepository.findAll(any(Specification.class), any(PageRequest.class)))
                 .thenReturn(pageResult);
 
-        List<User> result = userService.findByCriteria(criteria, value, 0, 10);
+        List<UserProfileAdminResponseDto> result = userService.findByCriteria(criteria, value, 0, 10);
 
         assertEquals(1, result.size());
-        assertEquals(value, result.getFirst().getUsername());
+        assertEquals(value, result.getFirst().username());
     }
 
     @Test
     @DisplayName("Негативный: неверный параметр поиска")
     void shouldThrows_whenInvalidSearchCriteriaKeyProvided() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        InvalidSearchCriteriaException ex = assertThrows(InvalidSearchCriteriaException.class,
                 () -> userService.findByCriteria("invalid_field", "value", 0, 10));
         assertTrue(ex.getMessage().contains("Неверный параметр"));
     }
