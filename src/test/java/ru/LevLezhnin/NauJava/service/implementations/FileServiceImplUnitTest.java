@@ -10,6 +10,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.util.MimeTypeUtils;
 import ru.LevLezhnin.NauJava.dto.file.FileDownloadRequestDto;
 import ru.LevLezhnin.NauJava.dto.file.FileDownloadResponseDto;
@@ -54,6 +57,8 @@ class FileServiceImplUnitTest {
     public static final String TEST_PASSWORD = "test_password";
 
     @Mock
+    private PlatformTransactionManager platformTransactionManager;
+    @Mock
     private FileRepository fileRepository;
     @Mock
     private FileStatisticsRepository fileStatisticsRepository;
@@ -81,7 +86,16 @@ class FileServiceImplUnitTest {
 
     @BeforeEach
     public void setUp() {
+
+        TransactionStatus mockTransactionStatus = mock(TransactionStatus.class);
+
+        lenient().when(platformTransactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(mockTransactionStatus);
+        lenient().doNothing().when(platformTransactionManager).commit(eq(mockTransactionStatus));
+        lenient().doNothing().when(platformTransactionManager).rollback(eq(mockTransactionStatus));
+
         fileService = new FileServiceImpl(
+                platformTransactionManager,
                 fileRepository,
                 fileStatisticsRepository,
                 fileStorageRepository,
@@ -91,7 +105,9 @@ class FileServiceImplUnitTest {
                 passwordEncoder,
                 new FileResponseMapper()
         );
+
         fileService.setBaseUrl(API_BASE_URL);
+
         testUser = User.builder()
                 .setId(1L)
                 .setUsername("test_user")
@@ -402,10 +418,11 @@ class FileServiceImplUnitTest {
     public void shouldDownloadFile_whenCorrectFileIdAndPasswordProvided() throws IOException {
 
         when(requestContextService.getUserId()).thenReturn(testUser.getId());
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
         when(fileStorageRepository.fileExistsByPath(testFilePath)).thenReturn(true);
         when(passwordEncoder.matches(any(CharSequence.class), eq(TEST_PASSWORD_HASH))).thenAnswer(i -> TEST_PASSWORD.equals(i.getArguments()[0]));
-        when(fileStatisticsRepository.save(any(FileStatistics.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(fileStatisticsRepository.onDownload(eq(testFileStatistics.getId()), any(Long.class), any(Instant.class))).thenReturn(1);
         when(fileStorageRepository.downloadByPath(testFilePath)).thenReturn(new ByteArrayInputStream(TEST_DATA.getBytes(StandardCharsets.UTF_8)));
 
         FileDownloadRequestDto fileDownloadRequestDto = new FileDownloadRequestDto(
@@ -427,32 +444,36 @@ class FileServiceImplUnitTest {
                 "Возвращаемый размер файла должен совпадать с ожидаемым");
 
         verify(passwordEncoder, times(1)).matches(any(CharSequence.class), any(String.class));
-        verify(fileStatisticsRepository, times(1)).save(eq(testFileStatistics));
+        verify(fileStatisticsRepository, times(1)).onDownload(eq(testFileStatistics.getId()), any(Long.class), any(Instant.class));
         verify(fileStorageRepository, times(1)).downloadByPath(eq(testFilePath));
-
-        ArgumentCaptor<FileStatistics> fileStatisticsArgumentCaptor = ArgumentCaptor.forClass(FileStatistics.class);
-        verify(fileStatisticsRepository, times(1)).save(fileStatisticsArgumentCaptor.capture());
-        FileStatistics fileStatisticsArgumentCaptorValue = fileStatisticsArgumentCaptor.getValue();
-        assertEquals(1L, testFileStatistics.getTimesDownloaded(),
-                "Счётчик скачиваний в объекте статистики должен увеличиться после скачивания");
-        assertEquals(1L, fileStatisticsArgumentCaptorValue.getTimesDownloaded(),
-                "В аргументе save() должен быть передан объект с увеличенным счётчиком скачиваний");
     }
 
     @Test
     @DisplayName("Позитивный тест: скачивание файла без пароля")
     public void shouldDownloadFile_whenCorrectFileIdAndNoPasswordProvided() throws IOException {
 
-        testFile.setPasswordHash(null);
+        File testFileWithoutPassword = File.builder()
+                .setId(testFileId)
+                .setPath(testFilePath)
+                .setName(TEST_FILE_NAME)
+                .setMimeType(MediaType.TEXT_PLAIN_VALUE)
+                .setUploadedAt(Instant.now())
+                .setExpireAt(Instant.now().plus(Duration.ofDays(1L)))
+                .setMaxDownloads(1L)
+                .setFileStatistics(testFileStatistics)
+                .setPasswordHash(null)
+                .setAuthor(testUser)
+                .build();
 
         when(requestContextService.getUserId()).thenReturn(testUser.getId());
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
-        when(fileStorageRepository.fileExistsByPath(testFilePath)).thenReturn(true);
-        when(fileStatisticsRepository.save(any(FileStatistics.class))).thenAnswer(i -> i.getArguments()[0]);
-        when(fileStorageRepository.downloadByPath(testFilePath)).thenReturn(new ByteArrayInputStream(TEST_DATA.getBytes(StandardCharsets.UTF_8)));
+        when(fileRepository.findById(testFileWithoutPassword.getId())).thenReturn(Optional.of(testFileWithoutPassword));
+        when(fileRepository.findForUpdateWithDetailsById(testFileWithoutPassword.getId())).thenReturn(Optional.of(testFileWithoutPassword));
+        when(fileStorageRepository.fileExistsByPath(testFileWithoutPassword.getPath())).thenReturn(true);
+        when(fileStatisticsRepository.onDownload(any(Long.class), any(Long.class), any(Instant.class))).thenReturn(1);
+        when(fileStorageRepository.downloadByPath(testFileWithoutPassword.getPath())).thenReturn(new ByteArrayInputStream(TEST_DATA.getBytes(StandardCharsets.UTF_8)));
 
         FileDownloadRequestDto fileDownloadRequestDto = new FileDownloadRequestDto(
-                testFileId.toString(),
+                testFileWithoutPassword.getId().toString(),
                 null
         );
 
@@ -471,20 +492,12 @@ class FileServiceImplUnitTest {
 
         verify(passwordEncoder, never()).matches(any(CharSequence.class), any(String.class));
         verify(fileStorageRepository, times(1)).downloadByPath(eq(testFilePath));
-
-        ArgumentCaptor<FileStatistics> fileStatisticsArgumentCaptor = ArgumentCaptor.forClass(FileStatistics.class);
-        verify(fileStatisticsRepository, times(1)).save(fileStatisticsArgumentCaptor.capture());
-        FileStatistics fileStatisticsArgumentCaptorValue = fileStatisticsArgumentCaptor.getValue();
-        assertEquals(1L, testFileStatistics.getTimesDownloaded(),
-                "Счётчик скачиваний в объекте статистики должен увеличиться после скачивания");
-        assertEquals(1L, fileStatisticsArgumentCaptorValue.getTimesDownloaded(),
-                "В аргументе save() должен быть передан объект с увеличенным счётчиком скачиваний");
+        verify(fileStatisticsRepository, times(1)).onDownload(eq(testFileStatistics.getId()), any(Long.class), any(Instant.class));
     }
 
     @Test
     @DisplayName("Негативный тест: скачивание файла должно завершиться с ошибкой, если метаданные о файле не нашлись в БД")
     public void shouldThrow_whenFileMetadataNotFoundInDatabase() {
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.empty());
         assertThrows(EntityNotFoundException.class, () -> fileService.downloadById(new FileDownloadRequestDto(testFileId.toString(), null)),
                 "Скачивание файла должно завершиться с ошибкой EntityNotFoundException, если метаданные о файле не нашлись в БД");
     }
@@ -492,7 +505,7 @@ class FileServiceImplUnitTest {
     @Test
     @DisplayName("Негативный тест: скачивание файла должно завершиться с ошибкой, если файл не нашёлся в хранилище")
     public void shouldThrow_whenFileNotFoundInFileStorage() {
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findById(testFileId)).thenReturn(Optional.of(testFile));
         when(fileStorageRepository.fileExistsByPath(testFilePath)).thenReturn(false);
         assertThrows(FileNotFoundException.class, () -> fileService.downloadById(new FileDownloadRequestDto(testFileId.toString(), null)),
                 "Скачивание файла должно завершиться с ошибкой FileNotFoundException, если файл не нашёлся в хранилище");
@@ -502,8 +515,9 @@ class FileServiceImplUnitTest {
     @DisplayName("Негативный тест: скачивание файла должно завершиться с ошибкой, если лимит скачиваний достигнут")
     public void shouldThrow_whenDownloadLimitReached() {
         testFileStatistics.setTimesDownloaded(testFile.getMaxDownloads());
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
         when(fileStorageRepository.fileExistsByPath(testFilePath)).thenReturn(true);
+        when(fileRepository.findById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
         assertThrows(DownloadLimitExceededException.class, () -> fileService.downloadById(new FileDownloadRequestDto(testFileId.toString(), null)),
                 "Скачивание файла должно завершиться с ошибкой DownloadLimitExceededException, если лимит скачиваний достигнут");
     }
@@ -512,7 +526,8 @@ class FileServiceImplUnitTest {
     @DisplayName("Негативный тест: скачивание файла должно завершиться с ошибкой, если время жизни файла истекло")
     public void shouldThrow_whenFileTTLExceeded() {
         testFile.setExpireAt(Instant.now().minus(Duration.ofMinutes(1)));
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
         when(fileStorageRepository.fileExistsByPath(testFilePath)).thenReturn(true);
         assertThrows(FileExpiredException.class, () -> fileService.downloadById(new FileDownloadRequestDto(testFileId.toString(), null)),
                 "Скачивание файла должно завершиться с ошибкой FileExpiredException, если время жизни файла истекло");
@@ -521,8 +536,9 @@ class FileServiceImplUnitTest {
     @Test
     @DisplayName("Негативный тест: скачивание файла должно завершиться с ошибкой, если пароль задан и не был передан в запросе")
     public void shouldThrow_whenFileIsSecuredButNoPasswordIsInRequest() {
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
         when(fileStorageRepository.fileExistsByPath(testFilePath)).thenReturn(true);
+        when(fileRepository.findById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
         when(passwordEncoder.matches(any(), eq(TEST_PASSWORD_HASH))).thenAnswer(i -> i.getArguments()[0] != null && TEST_PASSWORD.equals(i.getArguments()[0]));
         assertThrows(InvalidPasswordException.class, () -> fileService.downloadById(new FileDownloadRequestDto(testFileId.toString(), null)),
                 "Скачивание файла должно завершиться с ошибкой InvalidPasswordException, если пароль задан и не был передан в запросе");
@@ -531,7 +547,8 @@ class FileServiceImplUnitTest {
     @Test
     @DisplayName("Негативный тест: скачивание файла должно завершиться с ошибкой, если пароль задан и в запросе был передан неверный пароль")
     public void shouldThrow_whenFileIsSecuredButPasswordInRequestIsIncorrect() {
-        when(fileRepository.findWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFileId)).thenReturn(Optional.of(testFile));
+        when(fileRepository.findById(testFileId)).thenReturn(Optional.of(testFile));
         when(fileStorageRepository.fileExistsByPath(testFilePath)).thenReturn(true);
         when(passwordEncoder.matches(any(CharSequence.class), eq(TEST_PASSWORD_HASH))).thenAnswer(i -> i.getArguments()[0] != null && TEST_PASSWORD.equals(i.getArguments()[0]));
         assertThrows(InvalidPasswordException.class, () -> fileService.downloadById(new FileDownloadRequestDto(testFileId.toString(), "incorrect")),
@@ -545,7 +562,7 @@ class FileServiceImplUnitTest {
 
         when(requestContextService.getUserId()).thenReturn(testUser.getId());
         when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-        when(fileRepository.findWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
         doAnswer(args -> {
             Long delta = args.getArgument(1);
             testUserStorageQuota.setUsedStorageBytes(testUserStorageQuota.getUsedStorageBytes() + delta);
@@ -568,7 +585,7 @@ class FileServiceImplUnitTest {
 
         when(requestContextService.getUserId()).thenReturn(testAdmin.getId());
         when(userRepository.findById(testAdmin.getId())).thenReturn(Optional.of(testAdmin));
-        when(fileRepository.findWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
         doAnswer(args -> {
             Long delta = args.getArgument(1);
             testUserStorageQuota.setUsedStorageBytes(testUserStorageQuota.getUsedStorageBytes() + delta);
@@ -599,7 +616,6 @@ class FileServiceImplUnitTest {
     public void shouldThrow_whenDeleteFileMetadataNotFound() {
         when(requestContextService.getUserId()).thenReturn(testUser.getId());
         when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-        when(fileRepository.findWithDetailsById(testFile.getId())).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> fileService.deleteById(testFile.getId().toString()),
                 "Удаление должно завершиться с ошибкой EntityNotFoundException, если метаданные файла не найдены в БД");
@@ -615,7 +631,7 @@ class FileServiceImplUnitTest {
 
         when(requestContextService.getUserId()).thenReturn(123L);
         when(userRepository.findById(123L)).thenReturn(Optional.of(notAuthor));
-        when(fileRepository.findWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
+        when(fileRepository.findForUpdateWithDetailsById(testFile.getId())).thenReturn(Optional.of(testFile));
 
         assertThrows(IllegalFileAccessException.class, () -> fileService.deleteById(testFile.getId().toString()),
                 "Удаление должно завершиться с ошибкой IllegalFileAccessException, если файл удаляет пользователь-не-автор файла");

@@ -67,6 +67,11 @@ public class ViewController {
         return "download";
     }
 
+    @GetMapping("/notfound")
+    public String notFoundView() {
+        return "notfound";
+    }
+
     @GetMapping("/admin/users/list")
     public String userListView() {
         return "userList";

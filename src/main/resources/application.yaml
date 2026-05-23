@@ -21,12 +21,19 @@ spring:
 
   jpa:
     properties:
-      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 100
 
   servlet:
     multipart:
       max-file-size: 100MB
       max-request-size: 200MB
+
+  batch.job.enabled: false
+
+kind: Application
 
 minio:
   url: http://${MINIO_HOST}:${MINIO_PORT}
@@ -57,6 +64,13 @@ app:
       email: ${DEFAULT_ADMIN_EMAIL}
       password: ${DEFAULT_ADMIN_PASSWORD}
       quota-size: ${DEFAULT_ADMIN_QUOTA_SIZE}
+
+  files:
+    cleanup:
+      enabled: true
+      fetch-size: 100
+      skip-limit: 50
+      cron: 0 0 3 * * *
 
 jwt:
   accessSecret: ${ACCESS_JWT_SECRET}

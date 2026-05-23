@@ -6,10 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriUtils;
@@ -90,13 +87,14 @@ public class FileController {
     public ResponseEntity<Resource> downloadFileById(@RequestBody FileDownloadRequestDto fileDownloadRequestDto) {
         FileDownloadResponseDto fileDownloadResponseDto = fileService.downloadById(fileDownloadRequestDto);
 
-        String encodedFilename = UriUtils.encode(fileDownloadResponseDto.originalFilename(), StandardCharsets.UTF_8);
+        ContentDisposition contentDisposition = ContentDisposition.attachment()
+                .filename(fileDownloadResponseDto.originalFilename(), StandardCharsets.UTF_8)
+                .build();
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(fileDownloadResponseDto.contentType()))
                 .contentLength(fileDownloadResponseDto.sizeBytes())
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"%s\"; filename*=UTF-8''%s".formatted(fileDownloadResponseDto.originalFilename(), encodedFilename))
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                 .body(new InputStreamResource(fileDownloadResponseDto.fileDataInputStream()));
     }
 

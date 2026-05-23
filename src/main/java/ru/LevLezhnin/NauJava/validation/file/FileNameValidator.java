@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 public class FileNameValidator implements ConstraintValidator<FileNameValid, String> {
 
     private static final Pattern SAFE_FILENAME_PATTERN = Pattern.compile(
-            "^[\\wА-Яа-яЁё\\.\\_\\-]{1,200}.[a-zA-Z]{1,20}$"
+            "^[\\wА-Яа-яЁё\\.\\_\\-\\s]{1,200}\\.[a-zA-Z0-9]{1,20}$"
     );
 
     private static final Set<String> WINDOWS_RESERVED = Set.of(
@@ -23,10 +23,10 @@ public class FileNameValidator implements ConstraintValidator<FileNameValid, Str
     @Override
     public boolean isValid(String fileName, ConstraintValidatorContext constraintValidatorContext) {
         if (fileName == null) {
-            return false;
+            return true;
         }
         if (fileName.isBlank()) {
-            return false;
+            return true;
         }
         if (!SAFE_FILENAME_PATTERN.matcher(fileName).matches()) {
             return false;

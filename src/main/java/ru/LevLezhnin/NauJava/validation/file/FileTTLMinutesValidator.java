@@ -16,7 +16,7 @@ public class FileTTLMinutesValidator implements ConstraintValidator<FileTTLMinut
     public boolean isValid(Long fileTtlMinutes, ConstraintValidatorContext constraintValidatorContext) {
 
         if (fileTtlMinutes == null) {
-            return false;
+            return true;
         }
 
         return TTL_MINUTES_MIN.compareTo(fileTtlMinutes) <= 0 && fileTtlMinutes.compareTo(TTL_MINUTES_MAX) <= 0;

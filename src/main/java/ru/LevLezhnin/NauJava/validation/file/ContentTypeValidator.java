@@ -12,11 +12,11 @@ public class ContentTypeValidator implements ConstraintValidator<ContentTypeVali
     public boolean isValid(String contentType, ConstraintValidatorContext constraintValidatorContext) {
 
         if (contentType == null) {
-            return false;
+            return true;
         }
 
         if (contentType.isBlank()) {
-            return false;
+            return true;
         }
 
         try {

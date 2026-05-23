@@ -360,6 +360,7 @@ button {
   display: flex;
   align-items: flex-start;
   gap: 0.25rem;
+  white-space: pre-line;
 }
 .field-error-message::before {
   content: "⚠️";
@@ -413,7 +414,8 @@ button {
 .validation-summary__text {
   margin: 0;
   font-weight: 600;
-  color: #991b1b !important
+  color: #991b1b !important;
+  white-space: pre-line;
 }
 
 
@@ -657,6 +659,7 @@ button {
   padding: 1rem 1.2rem;
   border-radius: 16px;
   border: 1px solid transparent;
+  white-space: pre-line;
 }
 .alert--success {
   background: #ecfdf5;
@@ -756,6 +759,24 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+.file-card-error {
+  margin-top: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #991b1b;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  padding: 0.85rem 1rem;
+  display: none;
+}
+.file-card-error::before {
+  content: "⚠️";
+  margin-right: 0.35rem;
+}
+.file-card-error--visible {
+  display: block;
 }
 .btn-small {
   padding: 0.65rem 1rem;
@@ -1034,8 +1055,9 @@ button {
 .modal-footer .btn {
   flex: 1;
 }
-.forbidden-description {
-  font-size: 1.25rem;
+.forbidden-description,
+.notfound-description {
+  font-size: 1.1rem;
   font-weight: 500;
   color: var(--text);
   line-height: 1.6;

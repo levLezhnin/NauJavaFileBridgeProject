@@ -18,7 +18,7 @@ public class FilePasswordValidator implements ConstraintValidator<FilePasswordVa
         if (password == null) {
             return true;
         }
-        if (password.isEmpty()) {
+        if (password.isBlank()) {
             return true;
         }
         return FILE_PASSWORD_PATTERN.matcher(password).matches();

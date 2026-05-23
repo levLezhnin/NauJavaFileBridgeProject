@@ -14,6 +14,8 @@ import ru.LevLezhnin.NauJava.repository.jpa.StorageQuotaRepository;
 import ru.LevLezhnin.NauJava.service.base.AbstractStorageQuotaService;
 import ru.LevLezhnin.NauJava.utils.RequestContextService;
 
+import java.time.Instant;
+
 @Service
 public class StorageQuotaServiceImpl extends AbstractStorageQuotaService {
 
@@ -54,6 +56,7 @@ public class StorageQuotaServiceImpl extends AbstractStorageQuotaService {
         }
 
         storageQuota.setUsedStorageBytes(newUsedStorageBytes);
+        storageQuota.setUpdatedAt(Instant.now());
         storageQuotaRepository.save(storageQuota);
     }
 

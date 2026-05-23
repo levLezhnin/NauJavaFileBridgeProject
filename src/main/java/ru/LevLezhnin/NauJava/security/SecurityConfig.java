@@ -56,7 +56,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         // Статика и публичные страницы
-                        .requestMatchers("/", "/login", "/register", "/forbidden", "/css/**", "/js/**", "/assets/**").permitAll()
+                        .requestMatchers("/", "/login", "/register", "/forbidden", "/notfound", "/css/**", "/js/**", "/assets/**").permitAll()
 
                         // Админские страницы
                         .requestMatchers("/admin/**").hasRole(UserRole.ADMIN.name())

@@ -1,8 +1,6 @@
 package ru.LevLezhnin.NauJava.minio;
 
-import io.minio.BucketExistsArgs;
-import io.minio.MakeBucketArgs;
-import io.minio.MinioClient;
+import io.minio.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +12,7 @@ import ru.LevLezhnin.NauJava.exceptions.file.FileStorageException;
 import ru.LevLezhnin.NauJava.properties.MinioProperties;
 
 @Component
-@Profile("dev")
+@Profile({"dev", "prod"})
 public class BucketInitializer {
 
     private static final Logger log = LoggerFactory.getLogger(BucketInitializer.class);

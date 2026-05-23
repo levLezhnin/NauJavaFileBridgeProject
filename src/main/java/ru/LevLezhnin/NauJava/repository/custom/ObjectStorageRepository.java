@@ -39,4 +39,10 @@ public interface ObjectStorageRepository {
      * @param path путь до файла
      */
     void deleteByPath(String path);
+
+    /**
+     * Удаляет все файлы по переданным путям
+     * @param paths набор путей до файлов
+     */
+    void deleteAllByPathsInBatch(Iterable<String> paths);
 }

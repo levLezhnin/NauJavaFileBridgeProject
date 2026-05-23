@@ -9,7 +9,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import ru.LevLezhnin.NauJava.dto.file.*;
 import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
@@ -38,6 +40,8 @@ public class FileServiceImpl implements FileService {
     private static final String OBJECT_STORAGE_PATH_TEMPLATE = "/files/userId=%d/fileId=%s/data.bin";
     private static final String FILE_DOWNLOAD_LINK_PATH_TEMPLATE = "/download/%s";
 
+    private final TransactionTemplate transactionTemplate;
+
     private final FileRepository fileRepository;
     private final FileStatisticsRepository fileStatisticsRepository;
     @Qualifier("fileStorageRepository")
@@ -58,7 +62,8 @@ public class FileServiceImpl implements FileService {
     }
 
     @Autowired
-    public FileServiceImpl(FileRepository fileRepository,
+    public FileServiceImpl(PlatformTransactionManager platformTransactionManager,
+                           FileRepository fileRepository,
                            FileStatisticsRepository fileStatisticsRepository,
                            ObjectStorageRepository fileStorageRepository,
                            UserRepository userRepository,
@@ -66,6 +71,7 @@ public class FileServiceImpl implements FileService {
                            RequestContextService requestContextService,
                            PasswordEncoder passwordEncoder,
                            Mapper<File, FileResponseDto> fileResponseDtoMapper) {
+        this.transactionTemplate = new TransactionTemplate(platformTransactionManager);
         this.userRepository = userRepository;
         this.storageQuotaService = storageQuotaService;
         this.fileRepository = fileRepository;
@@ -78,6 +84,23 @@ public class FileServiceImpl implements FileService {
 
     private Long getCurrentUserId() {
         return requestContextService.getUserId();
+    }
+
+    private boolean isPasswordNotProvided(String incomingPassword) {
+        return incomingPassword == null || incomingPassword.isBlank();
+    }
+
+    private boolean isValidId(String id) {
+        if (id == null) {
+            return false;
+        }
+
+        try {
+            UUID.fromString(id);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
@@ -95,7 +118,7 @@ public class FileServiceImpl implements FileService {
         String objectStorageFilePath = OBJECT_STORAGE_PATH_TEMPLATE.formatted(author.getId(), fileId.toString());
         Instant uploadedAt = Instant.now();
         Instant expireAt = uploadedAt.plus(Duration.ofMinutes(fileUploadRequestDto.ttlMinutes()));
-        String passwordHash = fileUploadRequestDto.password() != null ? passwordEncoder.encode(fileUploadRequestDto.password()) : null;
+        String passwordHash = isPasswordNotProvided(fileUploadRequestDto.password()) ? null : passwordEncoder.encode(fileUploadRequestDto.password());
 
         storageQuotaService.updateStorageQuota(storageQuota.getId(), fileUploadRequestDto.fileSize());
 
@@ -154,15 +177,33 @@ public class FileServiceImpl implements FileService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     private File getEntityById(String fileId) {
+
+        if (!isValidId(fileId)) {
+            throw new FileNotFoundException("Файл с id: '%s' не найден".formatted(fileId));
+        }
+
         return fileRepository.findById(UUID.fromString(fileId))
                 .orElseThrow(() -> new EntityNotFoundException("Файл с id: %s не найден".formatted(fileId)));
     }
 
-    @Transactional(readOnly = true)
-    private File getEntityByIdWithDetails(String fileId) {
+    private File getEntityWithDetailsById(String fileId) {
+
+        if (!isValidId(fileId)) {
+            throw new FileNotFoundException("Файл с id: '%s' не найден".formatted(fileId));
+        }
+
         return fileRepository.findWithDetailsById(UUID.fromString(fileId))
+                .orElseThrow(() -> new EntityNotFoundException("Файл с id: %s не найден".formatted(fileId)));
+    }
+
+    private File getEntityByIdWithDetailsWithLock(String fileId) {
+
+        if (!isValidId(fileId)) {
+            throw new FileNotFoundException("Файл с id: '%s' не найден".formatted(fileId));
+        }
+
+        return fileRepository.findForUpdateWithDetailsById(UUID.fromString(fileId))
                 .orElseThrow(() -> new EntityNotFoundException("Файл с id: %s не найден".formatted(fileId)));
     }
 
@@ -173,53 +214,108 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public FileDownloadLinkResponseDto formDownloadLinkPath(String fileId) {
+
+        Long currentUserId = getCurrentUserId();
+
+        File file = getEntityWithDetailsById(fileId);
+        FileStatistics fileStatistics = file.getFileStatistics();
+
+        Long authorUserId = file.getAuthor().getId();
+        Instant expireAt = file.getExpireAt();
+        long timesDownloaded = fileStatistics.getTimesDownloaded();
+        long maxDownloads = file.getMaxDownloads();
+        String path = file.getPath();
+
+        if (expireAt.isBefore(Instant.now())) {
+            throw new FileExpiredException("Срок жизни файла истёк. Дальнейшее распространение файла невозможно");
+        }
+
+        if (timesDownloaded >= maxDownloads) {
+            throw new DownloadLimitExceededException("Лимит скачиваний исчерпан. Дальнейшее распространение файла невозможно");
+        }
+
+        if (!authorUserId.equals(currentUserId)) {
+            log.warn("Попытка получения ссылки на чужой файл. ID файла: {}, ID пользователя: {}", fileId, currentUserId);
+            throw new IllegalFileAccessException("Формирование ссылки на этот файл доступно только его владельцу");
+        }
+
+        if (!fileStorageRepository.fileExistsByPath(path)) {
+            throw new FileNotFoundException("Файл не найден");
+        }
+
+        log.info("Ссылка на скачивание сформирована. ID файла: {}. Пользователь, запросивший формирование ссылки: {}", fileId, currentUserId);
+
         return new FileDownloadLinkResponseDto(baseUrl + FILE_DOWNLOAD_LINK_PATH_TEMPLATE.formatted(fileId));
     }
 
     @Override
-    @Transactional
     public FileDownloadResponseDto downloadById(FileDownloadRequestDto fileDownloadRequestDto) {
 
-        File file = getEntityByIdWithDetails(fileDownloadRequestDto.fileId());
+        File fileMeta = getEntityById(fileDownloadRequestDto.fileId());
 
-        if (!fileStorageRepository.fileExistsByPath(file.getPath())) {
-            log.error("Данные о файле есть в БД, но файл отсутствует в хранилище. ID файла: {}, путь до файла: {}", file.getId(), file.getPath());
+        if (!fileStorageRepository.fileExistsByPath(fileMeta.getPath())) {
+            log.error("Данные о файле есть в БД, но файл отсутствует в хранилище. ID файла: {}, путь до файла: {}", fileMeta.getId(), fileMeta.getPath());
             throw new FileNotFoundException("Файл не найден");
         }
 
-        FileStatistics fileStatistics = file.getFileStatistics();
+        FileDownloadPreparation fileDownloadPreparation = transactionTemplate.execute(status -> {
+            File file = getEntityByIdWithDetailsWithLock(fileDownloadRequestDto.fileId());
 
-        if (fileStatistics.getTimesDownloaded().equals(file.getMaxDownloads())) {
-            log.warn("Лимит скачиваний исчерпан. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
-            throw new DownloadLimitExceededException("Достигнуто максимальное количество скачиваний файла");
-        }
+            FileStatistics fileStatistics = file.getFileStatistics();
 
-        if (Instant.now().isAfter(file.getExpireAt())) {
-            log.debug("Истёк срок жизни файла. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
-            throw new FileExpiredException("Срок жизни файла истёк");
-        }
-
-        if (file.hasPassword()) {
-            if (!passwordEncoder.matches(fileDownloadRequestDto.password(), file.getPasswordHash())) {
-                log.warn("Неверный пароль при скачивании. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
-                throw new InvalidPasswordException("Указан неверный пароль для скачивания файла");
+            if (fileStatistics.getTimesDownloaded() >= file.getMaxDownloads()) {
+                log.warn("Лимит скачиваний исчерпан. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
+                throw new DownloadLimitExceededException("Достигнуто максимальное количество скачиваний файла");
             }
-        }
 
-        fileStatistics.incrementDownloads();
-        fileStatisticsRepository.save(fileStatistics);
+            if (Instant.now().isAfter(file.getExpireAt())) {
+                log.debug("Истёк срок жизни файла. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
+                throw new FileExpiredException("Срок жизни файла истёк");
+            }
 
-        InputStream fileDataInputStream = fileStorageRepository.downloadByPath(file.getPath());
+            if (file.hasPassword()) {
+                if (!passwordEncoder.matches(fileDownloadRequestDto.password(), file.getPasswordHash())) {
+                    log.warn("Неверный пароль при скачивании. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
+                    throw new InvalidPasswordException("Указан неверный пароль для скачивания файла");
+                }
+            }
+
+            Instant downloadedAt = Instant.now();
+            int updated = fileStatisticsRepository.onDownload(fileStatistics.getId(), file.getMaxDownloads(), downloadedAt);
+
+            if (updated == 0) {
+                if (downloadedAt.isAfter(file.getExpireAt())) {
+                    log.debug("Файл просрочен. ID файла = {}", file.getId());
+                    throw new FileExpiredException("Срок жизни файла истёк");
+                }
+                if (fileStatistics.getTimesDownloaded() >= file.getMaxDownloads()) {
+                    log.warn("Лимит скачиваний исчерпан. ID файла = {}, путь до файла = {}", file.getId(), file.getPath());
+                    throw new DownloadLimitExceededException("Достигнуто максимальное количество скачиваний");
+                }
+                throw new FileNotFoundException("Файл недоступен для скачивания.");
+            }
+
+            return new FileDownloadPreparation(
+                    file.getPath(),
+                    file.getName(),
+                    file.getMimeType(),
+                    fileStatistics.getSizeBytes(),
+                    fileStatistics.getTimesDownloaded() + 1
+            );
+        });
+
+        InputStream fileDataInputStream = fileStorageRepository.downloadByPath(fileDownloadPreparation.filePath());
 
         log.info("Файл успешно скачан: ID файла: {}, ID пользователя, загрузившего файл: {}, Кол-во скачиваний: {}",
-                fileDownloadRequestDto.fileId(), getCurrentUserId(), fileStatistics.getTimesDownloaded());
+                fileDownloadRequestDto.fileId(), getCurrentUserId(), fileDownloadPreparation.newDownloadCount());
 
         return new FileDownloadResponseDto(
                 fileDataInputStream,
-                file.getName(),
-                file.getMimeType(),
-                fileStatistics.getSizeBytes()
+                fileDownloadPreparation.fileName(),
+                fileDownloadPreparation.mimeType(),
+                fileDownloadPreparation.fileSize()
         );
     }
 
@@ -231,9 +327,8 @@ public class FileServiceImpl implements FileService {
         User deleteRequestUser = userRepository.findById(deleteRequestUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Пользователь с id: %d не найден".formatted(deleteRequestUserId)));
 
+        File file = getEntityByIdWithDetailsWithLock(fileId);
         UUID fileUuid = UUID.fromString(fileId);
-
-        File file = getEntityByIdWithDetails(fileId);
 
         if (deleteRequestUser.getRole() != UserRole.ADMIN && !deleteRequestUser.getId().equals(file.getAuthor().getId())) {
             log.warn("Попытка неразрешённого удаления файла пользователем. ID файла: {}, ID пользователя: {}", fileUuid, deleteRequestUserId);
@@ -243,13 +338,21 @@ public class FileServiceImpl implements FileService {
         FileStatistics fileStatistics = file.getFileStatistics();
         User author = file.getAuthor();
 
-        fileStorageRepository.deleteByPath(file.getPath());
+        String filePath = file.getPath();
         fileRepository.deleteById(fileUuid);
 
         StorageQuota storageQuota = author.getStorageQuota();
         storageQuotaService.updateStorageQuota(storageQuota.getId(), -fileStatistics.getSizeBytes());
 
+        try {
+            fileStorageRepository.deleteByPath(filePath);
+        } catch (Exception e) {
+            log.error("Не удалось удалить файл из хранилища. ID файла: {}, путь до файла: {}", fileId, filePath, e);
+        }
+
         log.info("Файл успешно удалён: ID файла: {}, ID пользователя, удалившего файл: {}, Освобождено байт: {}",
                 fileId, deleteRequestUserId, fileStatistics.getSizeBytes());
     }
+
+    private record FileDownloadPreparation(String filePath, String fileName, String mimeType, long fileSize, long newDownloadCount){}
 }

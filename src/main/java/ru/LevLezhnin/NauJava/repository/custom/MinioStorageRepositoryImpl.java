@@ -2,14 +2,19 @@ package ru.LevLezhnin.NauJava.repository.custom;
 
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
+import io.minio.messages.DeleteError;
+import io.minio.messages.DeleteObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.util.InvalidMimeTypeException;
 import org.springframework.util.MimeTypeUtils;
 import ru.LevLezhnin.NauJava.exceptions.file.FileStorageException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
 
@@ -47,7 +52,7 @@ public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
             }
         }
 
-        contentType = contentType != null && !contentType.isBlank() ? contentType : "application/octet-stream";
+        contentType = contentType != null && !contentType.isBlank() ? contentType : MediaType.APPLICATION_OCTET_STREAM_VALUE;
 
         try {
             logger.debug("Загрузка файла в Minio: {}. Размер: {}. Content-Type: {}", path, size, contentType);
@@ -147,6 +152,61 @@ public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
             }
             logger.error("Не удалось удалить файл {}: {}", path, e.getMessage(), e);
             throw FileStorageException.deleteFailed(path, e);
+        }
+    }
+
+    @Override
+    public void deleteAllByPathsInBatch(Iterable<String> paths) {
+        if (paths == null) {
+            logger.warn("Попытка удаления файлов по null-списку путей");
+            return;
+        }
+
+        List<DeleteObject> validDeleteObjects = new ArrayList<>();
+        for (String path : paths) {
+            if (path != null && !path.isBlank()) {
+                validDeleteObjects.add(new DeleteObject(path));
+            }
+        }
+
+        if (validDeleteObjects.isEmpty()) {
+            logger.debug("Нет валидных путей для удаления");
+            return;
+        }
+
+        try {
+            Iterable<Result<DeleteError>> results = minioClient.removeObjects(
+                    RemoveObjectsArgs.builder()
+                            .bucket(bucketName)
+                            .objects(validDeleteObjects)
+                            .build()
+            );
+
+            int errorsCount = 0;
+            for (Result<DeleteError> result : results) {
+                try {
+                    DeleteError error = result.get();
+
+                    if (!isExceptionCausedByFileNotFound(new ErrorResponseException(error, null, null))) {
+                        logger.warn("Не удалось удалить объект {}: {} ({})", error.objectName(), error.code(), error.message());
+                        ++errorsCount;
+                    }
+                } catch (Exception e) {
+                    logger.error("Ошибка при  обработке результата удаления: {}", e.getMessage(), e);
+                    ++errorsCount;
+                }
+            }
+
+            if (errorsCount == 0) {
+                logger.info("Успешно удалено {} файлов из хранилища", validDeleteObjects.size());
+            } else {
+                logger.warn("Завершено пакетное удаление: {} успешно, {} с ошибками",
+                        validDeleteObjects.size() - errorsCount, errorsCount);
+            }
+
+        } catch (Exception e) {
+            logger.error("Возникла ошибка при пакетном удалении файлов");
+            throw FileStorageException.deleteFailed("batch[%d файлов]".formatted(validDeleteObjects.size()), e);
         }
     }
 

@@ -111,7 +111,21 @@ async function performFetchWithRefresh(path, options = {}) {
   fetchOptions.credentials = fetchOptions.credentials || 'same-origin';
 
   const executeFetch = async () => {
-    const response = await fetch(path, fetchOptions);
+    const isFetchNetworkError = (error) => {
+      const message = String(error?.message || '').toLowerCase();
+      return error instanceof TypeError || error?.name === 'TypeError' || error?.name === 'DOMException' || message.includes('failed to fetch') || message.includes('network') || message.includes('refused');
+    };
+
+    let response;
+    try {
+      response = await fetch(path, fetchOptions);
+    } catch (fetchError) {
+      if (isFetchNetworkError(fetchError)) {
+        throw new Error('Сетевая ошибка: не удалось подключиться к серверу. Проверьте подключение и попробуйте снова.');
+      }
+      throw fetchError;
+    }
+
     if (response.status === 401 && path !== '/api/v1/auth/refresh') {
       try {
         await refreshAccessToken();
@@ -146,6 +160,7 @@ function apiFetch(path, options = {}) {
         return Promise.reject(new Error('Redirecting to forbidden page'));
       }
       const error = new Error(data?.message || response.statusText);
+      error.status = response.status;
       if (data?.fieldErrors && Array.isArray(data.fieldErrors)) {
         error.details = data.fieldErrors.map(e => e.message).join(', ');
       }
@@ -629,6 +644,7 @@ function createFileCard(file) {
         🗑️ Удалить
       </button>
     </div>
+    <div class="file-card-error" aria-live="polite"></div>
   `;
   return card;
 }
@@ -680,17 +696,9 @@ async function loadFiles() {
 
     // Update quota information
     if (quotaData) {
-      const usedBytes = parseInt(quotaData.used_storage_bytes) || 0;
-      const maxBytes = parseInt(quotaData.max_storage_bytes) || 0;
-      const quotaUsed = document.querySelector('#quotaUsed');
-      const quotaTotal = document.querySelector('#quotaTotal');
-      if (quotaUsed) quotaUsed.textContent = formatBytes(usedBytes);
-      if (quotaTotal) quotaTotal.textContent = formatBytes(maxBytes);
+      updateQuotaDisplay(quotaData);
     } else {
-      const quotaUsed = document.querySelector('#quotaUsed');
-      const quotaTotal = document.querySelector('#quotaTotal');
-      if (quotaUsed) quotaUsed.textContent = '0';
-      if (quotaTotal) quotaTotal.textContent = '0';
+      updateQuotaDisplay(null);
     }
 
     const quotaFiles = document.querySelector('#quotaFiles');
@@ -716,11 +724,46 @@ function updateFileCount(count) {
   }
 }
 
+function updateQuotaDisplay(quotaData) {
+  const quotaUsed = document.querySelector('#quotaUsed');
+  const quotaTotal = document.querySelector('#quotaTotal');
+  if (!quotaUsed && !quotaTotal) return;
+
+  if (quotaData) {
+    const usedBytes = parseInt(quotaData.used_storage_bytes) || 0;
+    const maxBytes = parseInt(quotaData.max_storage_bytes) || 0;
+    if (quotaUsed) quotaUsed.textContent = formatBytes(usedBytes);
+    if (quotaTotal) quotaTotal.textContent = formatBytes(maxBytes);
+  } else {
+    if (quotaUsed) quotaUsed.textContent = '0';
+    if (quotaTotal) quotaTotal.textContent = '0';
+  }
+}
+
+function showFileCardError(card, message) {
+  if (!card) return;
+  const errorNode = card.querySelector('.file-card-error');
+  if (!errorNode) return;
+  errorNode.textContent = message;
+  errorNode.classList.add('file-card-error--visible');
+}
+
+function clearFileCardError(card) {
+  if (!card) return;
+  const errorNode = card.querySelector('.file-card-error');
+  if (!errorNode) return;
+  errorNode.textContent = '';
+  errorNode.classList.remove('file-card-error--visible');
+}
+
 async function handleCopyLink(event) {
   const button = event.currentTarget;
   const fileId = button.dataset.fileId;
   const originalText = button.textContent;
   
+  const card = button.closest('.file-card');
+  clearFileCardError(card);
+
   try {
     const response = await apiFetch(`/api/v1/files/link/${fileId}`);
     let link = response.download_link;
@@ -739,7 +782,9 @@ async function handleCopyLink(event) {
     
     showAlert('Ссылка скопирована в буфер обмена', 'success');
   } catch (error) {
-    showAlert(error.message || 'Ошибка копирования ссылки', 'error');
+    const message = error.details || error.message || 'Ошибка копирования ссылки';
+    showAlert(message, 'error');
+    showFileCardError(card, message);
   }
 }
 
@@ -766,6 +811,10 @@ async function handleDeleteFile(event) {
     const filesList = document.querySelector('#filesList');
     const fileCards = filesList.querySelectorAll('.file-card');
     updateFileCount(fileCards.length);
+
+    // Refresh quota after delete
+    const quotaData = await loadQuotaData();
+    updateQuotaDisplay(quotaData);
     
     // If no files left, show empty state
     if (fileCards.length === 0) {
@@ -1030,50 +1079,76 @@ function initDownloadPage() {
   const downloadForm = document.querySelector('#downloadForm');
   if (!downloadForm) return;
 
-  downloadForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const fileId = document.querySelector('#fileId').value;
-    const password = document.querySelector('#downloadPassword').value || null;
-    
-    const button = downloadForm.querySelector('button[type="submit"]');
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = '⏳ Скачивание...';
+  const fileId = document.querySelector('#fileId').value;
+  const button = downloadForm.querySelector('button[type="submit"]');
+  const originalText = button ? button.textContent : 'Скачать';
+  button.disabled = true;
+  button.textContent = '⏳ Проверяю файл...';
 
-    try {
-      // Single fetch request to download file as blob
-      const fetchResponse = await performFetchWithRefresh('/api/v1/files/download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/octet-stream'
-        },
-        body: JSON.stringify({
-          file_id: fileId,
-          password: password
-        })
-      });
+  apiFetch(`/api/v1/files/${encodeURIComponent(fileId)}`, { method: 'GET' })
+    .then(() => {
+      button.disabled = false;
+      button.textContent = originalText;
+
+      downloadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const password = document.querySelector('#downloadPassword').value || null;
+        button.disabled = true;
+        button.textContent = '⏳ Скачивание...';
+
+        try {
+          // Single fetch request to download file as blob
+          const fetchResponse = await performFetchWithRefresh('/api/v1/files/download', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/octet-stream'
+            },
+            body: JSON.stringify({
+              file_id: fileId,
+              password: password
+            })
+          });
 
       if (!fetchResponse.ok) {
+        if (fetchResponse.status === 404) {
+          const params = new URLSearchParams({
+            header: 'Файл не найден',
+            message: 'Запрашиваемый файл не найден или был удалён.'
+          });
+          window.location.href = `/notfound?${params.toString()}`;
+          return;
+        }
         const error = await fetchResponse.json().catch(() => null);
         throw new Error(error?.message || fetchResponse.statusText);
       }
 
       const blob = await fetchResponse.blob();
-      const contentDisposition = fetchResponse.headers.get('content-disposition');
+      const contentDisposition = fetchResponse.headers.get('content-disposition') || '';
       let filename = 'download';
 
       if (contentDisposition) {
-        // Try filename*=UTF-8''encoded first
-        let filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/);
+        // Try filename*=UTF-8''encoded first (RFC 5987)
+        let filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;\r\n]+)/i);
         if (filenameMatch && filenameMatch[1]) {
-          filename = decodeURIComponent(filenameMatch[1]);
+          try {
+            filename = decodeURIComponent(filenameMatch[1].trim());
+          } catch (e) {
+            // If decoding fails, use the encoded version
+            filename = filenameMatch[1].trim();
+          }
         } else {
-          // Fallback to filename="quoted"
-          filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+          // Fallback to filename="quoted" (RFC 2183)
+          filenameMatch = contentDisposition.match(/filename="([^"]+)"/i);
           if (filenameMatch && filenameMatch[1]) {
-            filename = filenameMatch[1];
+            filename = filenameMatch[1].trim();
+          } else {
+            // Last resort: filename without quotes
+            filenameMatch = contentDisposition.match(/filename=([^;\r\n]+)/i);
+            if (filenameMatch && filenameMatch[1]) {
+              filename = filenameMatch[1].trim();
+            }
           }
         }
       }
@@ -1096,6 +1171,22 @@ function initDownloadPage() {
       button.textContent = originalText;
     }
   });
+})
+.catch(error => {
+  if (error.status === 404) {
+    const params = new URLSearchParams({
+      header: 'Файл не найден',
+      message: 'Запрашиваемый файл не найден или был удалён.'
+    });
+    window.location.href = `/notfound?${params.toString()}`;
+    return;
+  }
+  showAlert(error.message || 'Ошибка проверки файла', 'error');
+  if (button) {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+});
 }
 
 // ============================================
