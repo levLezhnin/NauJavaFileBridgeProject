@@ -6,7 +6,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import ru.LevLezhnin.NauJava.validation.base.StringValidationBaseTest;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ContentTypeValidatorTest extends StringValidationBaseTest {
 

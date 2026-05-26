@@ -6,6 +6,21 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * Сущность квоты хранения для пользователя.
+ * <p>
+ * Отслеживает:
+ * <ul>
+ *   <li>Максимально допустимый объём в байтах</li>
+ *   <li>Текущий использованный объём</li>
+ *   <li>Время последнего обновления</li>
+ * </ul>
+ * Связана один-к-одному с {@link User}.
+ * <p>
+ * Предоставляет метод {@link #getBytesRemaining()} для расчёта остатка.
+ *
+ * @author Лев Лежнин
+ */
 @Entity
 @Table(name = "storage_quotas")
 public class StorageQuota {

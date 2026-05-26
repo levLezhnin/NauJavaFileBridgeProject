@@ -1,43 +1,42 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
 import ru.LevLezhnin.NauJava.dto.user.UpdateUserRequestDto;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileAdminResponseDto;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
-import ru.LevLezhnin.NauJava.exceptions.InvalidSearchCriteriaException;
-import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
-import ru.LevLezhnin.NauJava.exceptions.user.EmailTakenException;
-import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
-import ru.LevLezhnin.NauJava.exceptions.user.InvalidLoginException;
-import ru.LevLezhnin.NauJava.exceptions.user.UsernameTakenException;
-import ru.LevLezhnin.NauJava.model.File;
-import ru.LevLezhnin.NauJava.model.QuotaTariffs;
-import ru.LevLezhnin.NauJava.model.StorageQuota;
-import ru.LevLezhnin.NauJava.model.User;
-import ru.LevLezhnin.NauJava.model.UserBan;
-import ru.LevLezhnin.NauJava.model.UserRole;
+import ru.LevLezhnin.NauJava.exception.common.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exception.common.InvalidPasswordException;
+import ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException;
+import ru.LevLezhnin.NauJava.exception.user.EmailTakenException;
+import ru.LevLezhnin.NauJava.exception.user.InvalidLoginException;
+import ru.LevLezhnin.NauJava.exception.user.UsernameTakenException;
+import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
-import ru.LevLezhnin.NauJava.repository.user.search.UserSearchStrategy;
+import ru.LevLezhnin.NauJava.repository.search.user.UserSearchStrategy;
+import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
 import ru.LevLezhnin.NauJava.service.interfaces.UserService;
-import ru.LevLezhnin.NauJava.utils.RequestContextService;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
     private final UserRepository userRepository;
     private final RequestContextService requestContextService;
@@ -46,7 +45,11 @@ public class UserServiceImpl implements UserService {
     private final StorageQuotaService storageQuotaService;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, RequestContextService requestContextService, PasswordEncoder passwordEncryptor, List<UserSearchStrategy> userSearchStrategies, StorageQuotaService storageQuotaService) {
+    public UserServiceImpl(UserRepository userRepository,
+                           RequestContextService requestContextService,
+                           PasswordEncoder passwordEncryptor,
+                           List<UserSearchStrategy> userSearchStrategies,
+                           StorageQuotaService storageQuotaService) {
         this.userRepository = userRepository;
         this.requestContextService = requestContextService;
         this.passwordEncryptor = passwordEncryptor;
@@ -102,6 +105,9 @@ public class UserServiceImpl implements UserService {
             throw e;
         }
 
+        log.info("Создан новый пользователь. ID: {}, Логин: {}, Email: {}, Роль: {}",
+                user.getId(), user.getUsername(), user.getEmail(), user.getRole().name());
+
         return new UserProfileResponseDto(
                 user.getUsername(),
                 user.getEmail(),
@@ -114,6 +120,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserProfileResponseDto getProfile() {
         User user = getUserByAuthentication();
+        log.debug("Запрошен профиль. ID: {}", user.getId());
         return new UserProfileResponseDto(
                 user.getUsername(),
                 user.getEmail(),
@@ -127,6 +134,7 @@ public class UserServiceImpl implements UserService {
     public void updateUser(UpdateUserRequestDto updateUserRequestDto) {
 
         User user = getUserByAuthentication();
+        List<String> changedFields = new ArrayList<>();
 
         if (updateUserRequestDto.containsNewUsername()) {
             if (user.getUsername().equals(updateUserRequestDto.newUsername())) {
@@ -134,6 +142,7 @@ public class UserServiceImpl implements UserService {
             }
             checkUsernameUnique(updateUserRequestDto.newUsername());
             user.setUsername(updateUserRequestDto.newUsername());
+            changedFields.add("Логин");
         }
 
         if (updateUserRequestDto.containsNewPassword()) {
@@ -144,15 +153,21 @@ public class UserServiceImpl implements UserService {
                 throw new InvalidPasswordException("Указан неверный текущий пароль");
             }
             user.setPasswordHash(passwordEncryptor.encode(updateUserRequestDto.newPassword()));
+            changedFields.add("Пароль");
         }
 
         userRepository.save(user);
+
+        log.info("Профиль пользователя обновлён. ID: {}, Изменённые поля: [{}]", user.getId(), changedFields);
     }
 
     @Override
     @Transactional
     public void deleteUser() {
         User user = getUserByAuthentication();
+
+        Long userId = user.getId();
+        String username = user.getUsername();
 
         for (File file : user.getActiveFiles()) {
             file.setAuthor(null);
@@ -172,10 +187,31 @@ public class UserServiceImpl implements UserService {
         user.getBanHistory().clear();
 
         userRepository.delete(user);
+
+        log.warn("Пользователь удалён. ID: {}, Логин: {}. Связи с банами и файлами успешно очищены.", userId, username);
+    }
+
+    private User checkAdminRightsAndReturnEntity(Long adminId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> {
+                    log.error("Администратор не найден. ID администратора: {}", adminId);
+                    return new EntityNotFoundException("Администратор с id: %d не найден".formatted(adminId));
+                });
+
+        if (!UserRole.ADMIN.equals(admin.getRole())) {
+            log.warn("Пользователь {} попытался выполнить действие, не имея на это прав администратора", adminId);
+            throw new AccessDeniedException("Недостаточно прав для выполнения операции");
+        }
+        return admin;
     }
 
     @Override
     public List<UserProfileAdminResponseDto> findByCriteria(String searchBy, String searchValue, int page, int pageSize) {
+        User admin = checkAdminRightsAndReturnEntity(requestContextService.getUserId());
+
+        log.debug("Админ-поиск пользователей. ID администратора: {}, Критерий: {}, Значение: {}, Страница: {}, Значений на странице: {}",
+                admin.getId(), searchBy, searchValue, page, pageSize);
+
         Pageable pageable = PageRequest.of(page, pageSize);
 
         Specification<User> specification = Specification.unrestricted();
@@ -183,6 +219,7 @@ public class UserServiceImpl implements UserService {
         UserSearchStrategy userSearchStrategy = userSearchStrategyMap.get(searchBy);
 
         if (userSearchStrategy == null) {
+            log.warn("Неверный критерий поиска пользователей. searchBy: '{}', searchValue='{}'", searchBy, searchValue);
             throw new InvalidSearchCriteriaException("Неверный параметр search_by: " + searchBy);
         }
 

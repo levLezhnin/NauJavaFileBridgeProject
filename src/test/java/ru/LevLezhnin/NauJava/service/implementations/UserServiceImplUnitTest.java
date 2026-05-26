@@ -14,15 +14,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import ru.LevLezhnin.NauJava.dto.auth.RegistrationRequestDto;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileAdminResponseDto;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
-import ru.LevLezhnin.NauJava.exceptions.InvalidSearchCriteriaException;
-import ru.LevLezhnin.NauJava.exceptions.user.EmailTakenException;
-import ru.LevLezhnin.NauJava.exceptions.user.UsernameTakenException;
+import ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException;
+import ru.LevLezhnin.NauJava.exception.user.EmailTakenException;
+import ru.LevLezhnin.NauJava.exception.user.UsernameTakenException;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
-import ru.LevLezhnin.NauJava.repository.user.search.UserSearchStrategy;
+import ru.LevLezhnin.NauJava.repository.search.user.UserSearchStrategy;
+import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
 import ru.LevLezhnin.NauJava.utils.DataSizeConstants;
-import ru.LevLezhnin.NauJava.utils.RequestContextService;
 
 import java.util.List;
 import java.util.Optional;
@@ -124,6 +124,12 @@ class UserServiceImplUnitTest {
         User foundUser = User.builder().setUsername("john").build();
         Page<User> pageResult = new PageImpl<>(List.of(foundUser));
 
+        User testAdmin = User.builder()
+                .setUsername("testadmin")
+                .setRole(UserRole.ADMIN)
+                .build();
+
+        when(userRepository.findById(any(Long.class))).thenReturn(Optional.of(testAdmin));
         when(mockUsernameSearchStrategy.getSpecification(value)).thenReturn(Specification.unrestricted());
         when(userRepository.findAll(any(Specification.class), any(PageRequest.class)))
                 .thenReturn(pageResult);
@@ -137,6 +143,13 @@ class UserServiceImplUnitTest {
     @Test
     @DisplayName("Негативный: неверный параметр поиска")
     void shouldThrows_whenInvalidSearchCriteriaKeyProvided() {
+
+        User testAdmin = User.builder()
+                .setUsername("testadmin")
+                .setRole(UserRole.ADMIN)
+                .build();
+
+        when(userRepository.findById(any(Long.class))).thenReturn(Optional.of(testAdmin));
         InvalidSearchCriteriaException ex = assertThrows(InvalidSearchCriteriaException.class,
                 () -> userService.findByCriteria("invalid_field", "value", 0, 10));
         assertTrue(ex.getMessage().contains("Неверный параметр"));

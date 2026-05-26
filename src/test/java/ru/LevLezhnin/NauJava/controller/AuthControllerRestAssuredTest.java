@@ -38,7 +38,7 @@ class AuthControllerRestAssuredTest {
     }
 
     @Test
-    @DisplayName("Негативный: пустое тело запроса → 400")
+    @DisplayName("Негативный: пустое тело запроса - 400")
     void shouldReturn400_whenRegisterEmptyBody() {
         given()
                 .contentType(ContentType.JSON)
@@ -51,7 +51,7 @@ class AuthControllerRestAssuredTest {
     }
 
     @Test
-    @DisplayName("Негативный: отсутствие обязательных полей → 400")
+    @DisplayName("Негативный: отсутствие обязательных полей - 400")
     void shouldReturn400_whenRegisterMissingFields() {
         String body = """
                 {
@@ -70,7 +70,7 @@ class AuthControllerRestAssuredTest {
     }
 
     @Test
-    @DisplayName("Негативный: неверные учетные данные → 401")
+    @DisplayName("Негативный: неверные учетные данные - 401")
     void shouldReturn401_whenLoginWrongPassword() {
         String body = """
                 {
@@ -90,7 +90,7 @@ class AuthControllerRestAssuredTest {
     }
 
     @Test
-    @DisplayName("Пограничный случай: отсутствует кука refresh → 400/401")
+    @DisplayName("Пограничный случай: отсутствует кука refresh - 400/401")
     void shouldReturn400_whenMissingRefreshCookie() {
         given()
                 .contentType(ContentType.JSON)
@@ -102,7 +102,7 @@ class AuthControllerRestAssuredTest {
     }
 
     @Test
-    @DisplayName("Позитивный: выход из системы → 200")
+    @DisplayName("Позитивный: выход из системы - 200")
     void shouldReturn200_whenLogout() {
         given()
                 .when()

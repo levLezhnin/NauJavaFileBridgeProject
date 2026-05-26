@@ -6,31 +6,38 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.LevLezhnin.NauJava.dto.file.*;
-import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
-import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
-import ru.LevLezhnin.NauJava.exceptions.file.*;
+import ru.LevLezhnin.NauJava.exception.common.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exception.common.InvalidPasswordException;
+import ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException;
+import ru.LevLezhnin.NauJava.exception.file.*;
 import ru.LevLezhnin.NauJava.mapper.Mapper;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.custom.ObjectStorageRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.FileRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.FileStatisticsRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
+import ru.LevLezhnin.NauJava.repository.search.file.FileSearchStrategy;
+import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import ru.LevLezhnin.NauJava.service.interfaces.FileService;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
-import ru.LevLezhnin.NauJava.utils.RequestContextService;
 
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class FileServiceImpl implements FileService {
@@ -54,6 +61,8 @@ public class FileServiceImpl implements FileService {
 
     private final Mapper<File, FileResponseDto> fileResponseDtoMapper;
 
+    private final Map<String, FileSearchStrategy> fileSearchStrategyMap;
+
     @Value("${app.api.base-url}")
     private String baseUrl;
 
@@ -70,7 +79,8 @@ public class FileServiceImpl implements FileService {
                            StorageQuotaService storageQuotaService,
                            RequestContextService requestContextService,
                            PasswordEncoder passwordEncoder,
-                           Mapper<File, FileResponseDto> fileResponseDtoMapper) {
+                           Mapper<File, FileResponseDto> fileResponseDtoMapper,
+                           List<FileSearchStrategy> fileSearchStrategies) {
         this.transactionTemplate = new TransactionTemplate(platformTransactionManager);
         this.userRepository = userRepository;
         this.storageQuotaService = storageQuotaService;
@@ -80,6 +90,7 @@ public class FileServiceImpl implements FileService {
         this.requestContextService = requestContextService;
         this.passwordEncoder = passwordEncoder;
         this.fileResponseDtoMapper = fileResponseDtoMapper;
+        this.fileSearchStrategyMap = fileSearchStrategies.stream().collect(Collectors.toMap(FileSearchStrategy::getCriteriaKey, s -> s));
     }
 
     private Long getCurrentUserId() {
@@ -105,8 +116,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional
-    public FileResponseDto uploadFile(FileUploadRequestDto fileUploadRequestDto,
-                                      InputStream fileDataStream) {
+    public FileResponseDto uploadFile(FileUploadRequestDto fileUploadRequestDto, InputStream fileDataStream) {
 
         Long authorId = getCurrentUserId();
         User author = userRepository.findWithDetailsById(authorId)
@@ -171,9 +181,64 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(readOnly = true)
     public List<FileResponseDto> getCurrentUserFiles(int page, int pageSize) {
-        return fileRepository.findAllByAuthorIdOrderByUploadedAtDesc(getCurrentUserId(), PageRequest.of(page, pageSize))
+        Long currentUserId = getCurrentUserId();
+        log.debug("Запрос списка файлов. ID пользователя: {}, Страница: {}, Записей на странице: {}", currentUserId, page, pageSize);
+        return fileRepository.findAllByAuthorIdOrderByUploadedAtDesc(currentUserId, PageRequest.of(page, pageSize))
                 .stream()
                 .map(fileResponseDtoMapper::map)
+                .toList();
+    }
+
+    private User checkAdminRightsAndReturnEntity(Long adminId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> {
+                    log.error("Администратор не найден. ID администратора: {}", adminId);
+                    return new EntityNotFoundException("Администратор с id: %d не найден".formatted(adminId));
+                });
+
+        if (!UserRole.ADMIN.equals(admin.getRole())) {
+            log.warn("Пользователь {} попытался выполнить действие, не имея на это прав администратора", adminId);
+            throw new AccessDeniedException("Недостаточно прав для выполнения операции");
+        }
+        return admin;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FileAdminResponseDto> getAllFiles(String searchBy, String searchValue, int page, int pageSize) {
+
+        User admin = checkAdminRightsAndReturnEntity(requestContextService.getUserId());
+
+        log.debug("Админ-поиск файлов в системе. ID администратора: {}, Критерий: {}, Значение: {}, Страница: {}, Значений на странице: {}",
+                admin.getId(), searchBy, searchValue, page, pageSize);
+
+        Pageable pageable = PageRequest.of(page, pageSize);
+
+        Specification<File> specification = Specification.unrestricted();
+
+        FileSearchStrategy fileSearchStrategy = fileSearchStrategyMap.get(searchBy);
+
+        if (fileSearchStrategy == null) {
+            log.warn("Неверный критерий поиска файлов. searchBy: '{}', searchValue='{}'", searchBy, searchValue);
+            throw new InvalidSearchCriteriaException("Неверный параметр search_by: " + searchBy);
+        }
+
+        specification = specification.and(fileSearchStrategy.getSpecification(searchValue));
+
+        return fileRepository.findAll(specification, pageable)
+                .map(file -> new FileAdminResponseDto(
+                        file.getId().toString(),
+                        file.getName(),
+                        file.getMimeType(),
+                        file.getAuthor() != null ? file.getAuthor().getId().toString() : "",
+                        file.getAuthor().getUsername() != null ? file.getAuthor().getUsername() : "Неизвестно",
+                        file.getFileStatistics().getSizeBytes(),
+                        file.getUploadedAt(),
+                        file.getExpireAt(),
+                        file.getFileStatistics().getTimesDownloaded(),
+                        file.getMaxDownloads(),
+                        file.hasPassword()
+                ))
                 .toList();
     }
 
@@ -210,6 +275,7 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(readOnly = true)
     public FileResponseDto getById(String fileId) {
+        log.debug("Запрос метаданных файла. ID пользователя: {}, ID файла: {}", getCurrentUserId(), fileId);
         return fileResponseDtoMapper.map(getEntityById(fileId));
     }
 
@@ -218,6 +284,8 @@ public class FileServiceImpl implements FileService {
     public FileDownloadLinkResponseDto formDownloadLinkPath(String fileId) {
 
         Long currentUserId = getCurrentUserId();
+
+        log.debug("Формирование ссылки на скачивание файла. ID пользователя: {}, ID файла: {}", currentUserId, fileId);
 
         File file = getEntityWithDetailsById(fileId);
         FileStatistics fileStatistics = file.getFileStatistics();
@@ -245,7 +313,8 @@ public class FileServiceImpl implements FileService {
             throw new FileNotFoundException("Файл не найден");
         }
 
-        log.info("Ссылка на скачивание сформирована. ID файла: {}. Пользователь, запросивший формирование ссылки: {}", fileId, currentUserId);
+        log.info("Ссылка на скачивание сформирована. ID файла: {}. Пользователь, запросивший формирование ссылки: {}",
+                fileId, currentUserId);
 
         return new FileDownloadLinkResponseDto(baseUrl + FILE_DOWNLOAD_LINK_PATH_TEMPLATE.formatted(fileId));
     }
@@ -253,10 +322,13 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileDownloadResponseDto downloadById(FileDownloadRequestDto fileDownloadRequestDto) {
 
+        log.debug("Запрос скачивания файла. ID пользователя: {}, ID файла: {}", getCurrentUserId(), fileDownloadRequestDto.fileId());
+
         File fileMeta = getEntityById(fileDownloadRequestDto.fileId());
 
         if (!fileStorageRepository.fileExistsByPath(fileMeta.getPath())) {
-            log.error("Данные о файле есть в БД, но файл отсутствует в хранилище. ID файла: {}, путь до файла: {}", fileMeta.getId(), fileMeta.getPath());
+            log.error("Данные о файле есть в БД, но файл отсутствует в хранилище. ID файла: {}, путь до файла: {}",
+                    fileMeta.getId(), fileMeta.getPath());
             throw new FileNotFoundException("Файл не найден");
         }
 
@@ -266,18 +338,21 @@ public class FileServiceImpl implements FileService {
             FileStatistics fileStatistics = file.getFileStatistics();
 
             if (fileStatistics.getTimesDownloaded() >= file.getMaxDownloads()) {
-                log.warn("Лимит скачиваний исчерпан. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
+                log.warn("Лимит скачиваний исчерпан. ID файла: {}, ID пользователя, запросившего скачивание: {}",
+                        file.getId(), getCurrentUserId());
                 throw new DownloadLimitExceededException("Достигнуто максимальное количество скачиваний файла");
             }
 
             if (Instant.now().isAfter(file.getExpireAt())) {
-                log.debug("Истёк срок жизни файла. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
+                log.debug("Истёк срок жизни файла. ID файла: {}, ID пользователя, запросившего скачивание: {}",
+                        file.getId(), getCurrentUserId());
                 throw new FileExpiredException("Срок жизни файла истёк");
             }
 
             if (file.hasPassword()) {
                 if (!passwordEncoder.matches(fileDownloadRequestDto.password(), file.getPasswordHash())) {
-                    log.warn("Неверный пароль при скачивании. ID файла: {}, ID пользователя, запросившего скачивание: {}", file.getId(), getCurrentUserId());
+                    log.warn("Неверный пароль при скачивании. ID файла: {}, ID пользователя, запросившего скачивание: {}",
+                            file.getId(), getCurrentUserId());
                     throw new InvalidPasswordException("Указан неверный пароль для скачивания файла");
                 }
             }
@@ -323,15 +398,19 @@ public class FileServiceImpl implements FileService {
     @Transactional
     public void deleteById(String fileId) {
 
+        log.debug("Запрос удаления файла. ID пользователя: {}, ID файла: {}", getCurrentUserId(), fileId);
+
         Long deleteRequestUserId = getCurrentUserId();
         User deleteRequestUser = userRepository.findById(deleteRequestUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Пользователь с id: %d не найден".formatted(deleteRequestUserId)));
+        UserRole deleteRequestUserRole = deleteRequestUser.getRole();
 
         File file = getEntityByIdWithDetailsWithLock(fileId);
         UUID fileUuid = UUID.fromString(fileId);
 
-        if (deleteRequestUser.getRole() != UserRole.ADMIN && !deleteRequestUser.getId().equals(file.getAuthor().getId())) {
-            log.warn("Попытка неразрешённого удаления файла пользователем. ID файла: {}, ID пользователя: {}", fileUuid, deleteRequestUserId);
+        if (deleteRequestUserRole != UserRole.ADMIN && !deleteRequestUser.getId().equals(file.getAuthor().getId())) {
+            log.warn("Попытка неразрешённого удаления файла пользователем. ID файла: {}, ID пользователя: {}",
+                    fileUuid, deleteRequestUserId);
             throw new IllegalFileAccessException("Удаление этого файла доступно только его владельцу и администраторам");
         }
 
@@ -350,8 +429,13 @@ public class FileServiceImpl implements FileService {
             log.error("Не удалось удалить файл из хранилища. ID файла: {}, путь до файла: {}", fileId, filePath, e);
         }
 
-        log.info("Файл успешно удалён: ID файла: {}, ID пользователя, удалившего файл: {}, Освобождено байт: {}",
-                fileId, deleteRequestUserId, fileStatistics.getSizeBytes());
+        if (deleteRequestUserRole == UserRole.ADMIN) {
+            log.info("Файл успешно удалён администратором: ID файла: {}, ID администратора: {}, Освобождено байт: {}",
+                    fileId, deleteRequestUserId, fileStatistics.getSizeBytes());
+        } else {
+            log.info("Файл успешно удалён автором: ID файла: {}, ID автора: {}, Освобождено байт: {}",
+                    fileId, deleteRequestUserId, fileStatistics.getSizeBytes());
+        }
     }
 
     private record FileDownloadPreparation(String filePath, String fileName, String mimeType, long fileSize, long newDownloadCount){}

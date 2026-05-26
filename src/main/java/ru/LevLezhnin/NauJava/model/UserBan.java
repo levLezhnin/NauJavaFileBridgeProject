@@ -6,6 +6,21 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * Сущность истории банов пользователей.
+ * <p>
+ * Фиксирует:
+ * <ul>
+ *   <li>Причину бана</li>
+ *   <li>Время наложения и снятия бана</li>
+ *   <li>Администратора, применившего бан</li>
+ *   <li>Забаненного пользователя</li>
+ * </ul>
+ * Используется для аудита и истории действий администраторов.
+ *
+ * @author Лев Лежнин
+ * @see User
+ */
 @Entity
 @Table(name = "user_bans")
 public class UserBan {

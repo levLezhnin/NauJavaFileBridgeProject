@@ -15,7 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
 import ru.LevLezhnin.NauJava.model.UserBan;
 import ru.LevLezhnin.NauJava.repository.jpa.UserBanRepository;
-import ru.LevLezhnin.NauJava.utils.RequestContextService;
+import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
@@ -26,6 +26,22 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
+/**
+ * Фильтр безопасности, проверяющий, не заблокирован ли текущий аутентифицированный пользователь.
+ * <p>
+ * Выполняется после {@link JwtRequestFilter} (order = 1).
+ * <p>
+ * Если у пользователя есть активная блокировка:
+ * <ul>
+ *   <li>Для HTML-запросов - редирект на /forbidden с параметрами бана</li>
+ *   <li>Для API-запросов - возврат 403 JSON с информацией о блокировке</li>
+ * </ul>
+ * Пропускает статические ресурсы, logout и саму страницу /forbidden.
+ * <p>
+ * Использует {@link RequestContextService} для получения ID пользователя.
+ *
+ * @author Lev Lezhnin
+ */
 @Component
 @Order(1)
 public class UserBanFilter extends OncePerRequestFilter {
@@ -100,6 +116,10 @@ public class UserBanFilter extends OncePerRequestFilter {
 
             if (activeBanOpt.isPresent()) {
                 UserBan activeBan = activeBanOpt.get();
+
+                log.info("Пользователь заблокирован. ID пользователя: {}, ID админа, выдавшего блокировку: {}, Причина: {}",
+                        userId, activeBan.getAdmin().getId(), activeBan.getReason());
+
                 String accept = request.getHeader("Accept");
                 if (accept != null && accept.contains("text/html")) {
                     String encodedReason = URLEncoder.encode(activeBan.getReason(), StandardCharsets.UTF_8);

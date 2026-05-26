@@ -11,6 +11,15 @@ spring:
       minimum-idle: 15
       connection-timeout: 30_000
       idle-timeout: 30_000
+
+minio:
+  connection:
+    connect-timeout: 10s
+    write-timeout: 30s
+    read-timeout: 30s
+    max-idle-connections: 50
+    keep-alive-duration: 5m
+
 management:
   endpoints:
     web:

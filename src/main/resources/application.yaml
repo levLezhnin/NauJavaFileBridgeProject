@@ -31,6 +31,10 @@ spring:
       max-file-size: 100MB
       max-request-size: 200MB
 
+  error:
+    whitelabel:
+      enabled: false
+
   batch.job.enabled: false
 
 kind: Application
@@ -43,8 +47,6 @@ minio:
   buckets:
     fileBucket:
       name: ${MINIO_FILE_BUCKET}
-    reportBucket:
-      name: ${MINIO_REPORT_BUCKET}
 
 app:
   name: File Bridge

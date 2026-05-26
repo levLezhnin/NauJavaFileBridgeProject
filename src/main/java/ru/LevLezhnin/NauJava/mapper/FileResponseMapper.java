@@ -11,6 +11,7 @@ public class FileResponseMapper implements Mapper<File, FileResponseDto> {
         return new FileResponseDto(
                 object.getId().toString(),
                 object.getName(),
+                object.getFileStatistics().getSizeBytes(),
                 object.getUploadedAt(),
                 object.getExpireAt(),
                 object.getFileStatistics().getTimesDownloaded(),

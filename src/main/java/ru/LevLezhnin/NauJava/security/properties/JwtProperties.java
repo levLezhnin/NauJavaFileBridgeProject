@@ -5,6 +5,12 @@ import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
 
+/**
+ * Конфигурация JWT (секреты и lifetime токенов).
+ * Префикс: jwt.*
+ *
+ * @author Лев Лежнин
+ */
 @Configuration
 @ConfigurationProperties(prefix = "jwt")
 public class JwtProperties {

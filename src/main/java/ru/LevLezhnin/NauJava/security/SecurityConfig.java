@@ -21,12 +21,25 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import ru.LevLezhnin.NauJava.model.UserRole;
 import ru.LevLezhnin.NauJava.security.filter.JwtRequestFilter;
 import ru.LevLezhnin.NauJava.security.filter.UserBanFilter;
-import ru.LevLezhnin.NauJava.model.UserRole;
 
 import java.util.Map;
 
+/**
+ * Конфигурация Spring Security для File Bridge.
+ * <p>
+ * Настраивает:
+ * <ul>
+ *   <li>Stateless сессии (JWT)</li>
+ *   <li>JWT-фильтры</li>
+ *   <li>Правила доступа по ролям</li>
+ *   <li>Обработку logout и ошибок аутентификации</li>
+ * </ul>
+ *
+ * @author Лев Лежнин
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -56,7 +69,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         // Статика и публичные страницы
-                        .requestMatchers("/", "/login", "/register", "/forbidden", "/notfound", "/css/**", "/js/**", "/assets/**").permitAll()
+                        .requestMatchers("/", "/login", "/register", "/forbidden", "/notfound", "/error", "/error/**", "/css/**", "/js/**", "/assets/**").permitAll()
 
                         // Админские страницы
                         .requestMatchers("/admin/**").hasRole(UserRole.ADMIN.name())
@@ -148,7 +161,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) {
         return authenticationConfiguration.getAuthenticationManager();
     }
 }

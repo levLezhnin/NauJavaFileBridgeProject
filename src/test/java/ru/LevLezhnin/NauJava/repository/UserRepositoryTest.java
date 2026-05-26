@@ -3,25 +3,23 @@ package ru.LevLezhnin.NauJava.repository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.LevLezhnin.NauJava.constants.ContainerVersionConstants;
-import ru.LevLezhnin.NauJava.utils.DataSizeConstants;
 import ru.LevLezhnin.NauJava.model.*;
-import ru.LevLezhnin.NauJava.repository.custom.UserRepositoryImpl;
 import ru.LevLezhnin.NauJava.repository.jpa.FileRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.UserBanRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
+import ru.LevLezhnin.NauJava.utils.DataSizeConstants;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -30,13 +28,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM_VALUE;
 import static org.springframework.http.MediaType.TEXT_PLAIN_VALUE;
 
 @DataJpaTest
 @SpringJUnitConfig
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(UserRepositoryImpl.class)
 @ActiveProfiles("test")
 @Testcontainers
 public class UserRepositoryTest {
@@ -49,9 +45,6 @@ public class UserRepositoryTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private UserRepositoryImpl userRepositoryCustom;
 
     @Autowired
     private UserBanRepository userBanRepository;
@@ -214,96 +207,6 @@ public class UserRepositoryTest {
     }
 
     /**
-     * Тест Criteria API метода findById
-     */
-    @Test
-    void testCustomFindByIdWithCriteria() {
-        // When
-        Optional<User> foundUser = userRepositoryCustom.findById(testUser1.getId());
-
-        // Then
-        assertThat(foundUser).isPresent();
-        assertThat(foundUser.get().getUsername()).isEqualTo("john_doe");
-        assertThat(foundUser.get().getEmail()).isEqualTo("john@example.com");
-    }
-
-    /**
-     * Тест Criteria API метода findById с несуществующим ID
-     */
-    @Test
-    void testCustomFindByIdNotFound() {
-        // When
-        Optional<User> foundUser = userRepositoryCustom.findById(999L);
-
-        // Then
-        assertThat(foundUser).isEmpty();
-    }
-
-    /**
-     * Тест Criteria API метода findByEmail
-     */
-    @Test
-    void testCustomFindByEmailWithCriteria() {
-        // When
-        Optional<User> foundUser = userRepositoryCustom.findByEmail("jane@example.com");
-
-        // Then
-        assertThat(foundUser).isPresent();
-        assertThat(foundUser.get().getUsername()).isEqualTo("jane_smith");
-        assertThat(foundUser.get().getEmail()).isEqualTo("jane@example.com");
-    }
-
-    /**
-     * Тест Criteria API метода findAll с пагинацией
-     */
-    @Test
-    void testCustomFindAllWithPagination() {
-        // Given
-        Pageable pageable = PageRequest.of(0, 2);
-
-        // When
-        List<User> users = userRepositoryCustom.findAll(pageable);
-
-        // Then
-        assertThat(users).hasSize(2);
-        assertThat(users.get(0).getId()).isLessThan(users.get(1).getId()); // Проверяем сортировку по ID
-    }
-
-    /**
-     * Тест Criteria API метода findByUsername с пагинацией
-     */
-    @Test
-    void testCustomFindByUsernameWithCriteria() {
-        // Given
-        Pageable pageable = PageRequest.of(0, 10);
-
-        // When
-        List<User> users = userRepositoryCustom.findByUsername("%john%", pageable);
-
-        // Then
-        assertThat(users).hasSize(1);
-        assertThat(users.get(0).getUsername()).isEqualTo("john_doe");
-    }
-
-    /**
-     * Тест Criteria API метода deleteById
-     */
-    @Test
-    void testCustomDeleteByIdWithCriteria() {
-        // Given
-        Long userIdToDelete = testUser2.getId();
-
-        // When
-        userRepositoryCustom.deleteById(userIdToDelete);
-        entityManager.flush();
-        entityManager.clear();
-
-        // Then
-        Optional<User> deletedUser = userRepository.findById(userIdToDelete);
-        assertThat(deletedUser).isEmpty();
-    }
-
-    /**
      * Тест транзакционной операции создания файла и обновления квоты пользователя
      * Положительный кейс
      */
@@ -411,31 +314,6 @@ public class UserRepositoryTest {
 
         // Проверяем, что количество файлов не изменилось
         assertThat(fileRepository.count()).isEqualTo(initialFileCount);
-    }
-
-    /**
-     * Тест транзакционной операции удаления пользователя с каскадным удалением файлов
-     * Положительный кейс
-     */
-    @Test
-    @Transactional
-    void testTransactionalUserDeletionWithCascade() {
-        // Given
-        Long userId = testUser1.getId();
-        UUID fileId = testFile.getId();
-
-        // When
-        userRepositoryCustom.deleteById(userId);
-        entityManager.flush();
-        entityManager.clear();
-
-        // Then
-        Optional<User> deletedUser = userRepositoryCustom.findById(userId);
-        Optional<File> changedFile = fileRepository.findById(fileId);
-
-        assertThat(deletedUser).isEmpty();
-        assertThat(changedFile).isPresent();
-        assertThat(changedFile.get().getAuthor()).isNull();
     }
 
     /**

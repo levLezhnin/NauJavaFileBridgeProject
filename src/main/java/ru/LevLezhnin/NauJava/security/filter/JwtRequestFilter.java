@@ -15,13 +15,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
-import ru.LevLezhnin.NauJava.exceptions.auth.InvalidTokenException;
-import ru.LevLezhnin.NauJava.exceptions.auth.TokenExpiredException;
+import ru.LevLezhnin.NauJava.exception.auth.InvalidTokenException;
+import ru.LevLezhnin.NauJava.exception.auth.TokenExpiredException;
+import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import ru.LevLezhnin.NauJava.security.properties.JwtProperties;
+import ru.LevLezhnin.NauJava.security.utils.JwtTokenHelper;
+import ru.LevLezhnin.NauJava.security.utils.TokenCookieService;
 import ru.LevLezhnin.NauJava.service.interfaces.TokenBlacklistService;
-import ru.LevLezhnin.NauJava.utils.TokenCookieService;
-import ru.LevLezhnin.NauJava.utils.JwtTokenHelper;
-import ru.LevLezhnin.NauJava.utils.RequestContextService;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
@@ -31,6 +31,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Фильтр Spring Security, который проверяет JWT-токены в каждом запросе.
+ * <p>
+ * Извлекает access-токен из cookie, валидирует, устанавливает Authentication.
+ * Также обрабатывает ошибки токенов и возвращает JSON-ошибки.
+ *
+ * @author Лев Лежнин
+ */
 @Component
 @Order(0)
 public class JwtRequestFilter extends OncePerRequestFilter {
@@ -54,6 +62,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     private String tryExtractTokenFromHeader(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            log.debug("Токен найден в заголовке Authorization");
             return bearerToken.substring("Bearer ".length());
         }
         return null;
@@ -101,6 +110,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
+        log.debug("Обработка запроса в JwtRequestFilter: URI={}, метод={}",
+                request.getRequestURI(), request.getMethod());
+
         String requestURI = request.getRequestURI();
 
         if (requestURI.equals("/") ||
@@ -121,6 +133,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         if (jwt == null) {
             jwt = tokenCookieService.getTokenFromCookie(request, JwtProperties.JWT_ACCESS_TOKEN_COOKIE_NAME);
+            log.debug("Токен найден в куки: {}", jwt != null);
         }
 
         if (jwt != null) {

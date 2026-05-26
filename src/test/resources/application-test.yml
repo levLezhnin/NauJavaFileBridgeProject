@@ -20,8 +20,6 @@ minio:
   buckets:
     fileBucket:
       name: test-files
-    reportBucket:
-      name: test-reports
 
 app:
   api:

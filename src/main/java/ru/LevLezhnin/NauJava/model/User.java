@@ -8,6 +8,25 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Сущность пользователя системы File Bridge.
+ * <p>
+ * Хранит основные данные учётной записи:
+ * <ul>
+ *   <li>Уникальные username и email</li>
+ *   <li>Хеш пароля</li>
+ *   <li>Роль ({@link UserRole})</li>
+ *   <li>Статус активности (для банов)</li>
+ *   <li>Связанные квоты хранения и файлы</li>
+ * </ul>
+ * <p>
+ * Используется в аутентификации, авторизации и управлении пользователями.
+ * Имеет builder для удобного создания.
+ *
+ * @see UserRole
+ * @see StorageQuota
+ * @author Лев Лежнин
+ */
 @Entity
 @Table(name = "users")
 public class User {

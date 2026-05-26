@@ -59,10 +59,6 @@ services:
       echo 'Creating bucket:' ${MINIO_FILE_BUCKET};
       mc mb file-storage/${MINIO_FILE_BUCKET} && echo 'Created' || echo 'Already exists';
       mc anonymous set none file-storage/${MINIO_FILE_BUCKET};
-      
-      echo 'Creating bucket:' ${MINIO_REPORT_BUCKET};
-      mc mb file-storage/${MINIO_REPORT_BUCKET} && echo 'Created' || echo 'Already exists';
-      mc anonymous set none file-storage/${MINIO_REPORT_BUCKET};
 
       mc ls file-storage;
 

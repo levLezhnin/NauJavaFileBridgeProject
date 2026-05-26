@@ -3,9 +3,18 @@ package ru.LevLezhnin.NauJava.security.properties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Конфигурация параметров HTTP-кук (префикс {@code cookie.*}).
+ * <p>
+ * Используется {@link ru.LevLezhnin.NauJava.security.utils.TokenCookieService}
+ * при установке access/refresh токенов.
+ *
+ * @author Lev Lezhnin
+ */
 @Configuration
 @ConfigurationProperties("cookie")
 public class CookieProperties {
+
     private String path;
     private String sameSite;
     private boolean secure;

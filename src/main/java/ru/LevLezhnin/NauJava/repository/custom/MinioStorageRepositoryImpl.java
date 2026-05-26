@@ -9,13 +9,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.util.InvalidMimeTypeException;
 import org.springframework.util.MimeTypeUtils;
-import ru.LevLezhnin.NauJava.exceptions.file.FileStorageException;
+import ru.LevLezhnin.NauJava.exception.file.FileStorageException;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Реализация {@link ObjectStorageRepository} на базе MinIO SDK.
+ *
+ * @author Лев Лежнин
+ */
 public class MinioStorageRepositoryImpl implements ObjectStorageRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(MinioStorageRepositoryImpl.class);

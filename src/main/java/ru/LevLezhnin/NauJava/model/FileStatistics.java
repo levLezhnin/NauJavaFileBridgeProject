@@ -5,6 +5,19 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * Сущность статистики скачиваний файла.
+ * <p>
+ * Хранит:
+ * <ul>
+ *   <li>Количество скачиваний</li>
+ *   <li>Размер файла в байтах</li>
+ *   <li>Время последнего скачивания</li>
+ * </ul>
+ * Связана один-к-одному с {@link File}.
+ *
+ * @author Лев Лежнин
+ */
 @Entity
 @Table(name = "file_statistics")
 public class FileStatistics {

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ошибка сервера | File Bridge</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+<main class="page-shell error-shell">
+    <section class="error-card">
+        <div>
+            <p class="eyebrow">Ошибка</p>
+            <h1>Что-то пошло не так</h1>
+            <p class="notfound-description">Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже.</p>
+        </div>
+    </section>
+</main>
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>

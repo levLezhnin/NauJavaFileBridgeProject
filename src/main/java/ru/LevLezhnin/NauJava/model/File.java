@@ -7,6 +7,23 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Сущность файла, загруженного пользователем в систему File Bridge.
+ * <p>
+ * Содержит метаданные файла:
+ * <ul>
+ *   <li UUID в качестве идентификатора</li>
+ *   <li>Путь в хранилище (MinIO)</li>
+ *   <li>Имя, MIME-тип</li>
+ *   <li>Время загрузки и истечения срока действия</li>
+ *   <li>Максимальное количество скачиваний</li>
+ *   <li>Опциональный хеш пароля для доступа</li>
+ * </ul>
+ * Связана с автором ({@link User}) и статистикой скачиваний ({@link FileStatistics}).
+ *
+ * @author Лев Лежнин
+ * @see FileStatistics
+ */
 @Entity
 @Table(name = "files")
 public class File {

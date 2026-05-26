@@ -1,10 +1,17 @@
 package ru.LevLezhnin.NauJava.service.base;
 
+import ru.LevLezhnin.NauJava.config.properties.QuotaProperties;
 import ru.LevLezhnin.NauJava.model.QuotaTariffs;
 import ru.LevLezhnin.NauJava.model.StorageQuota;
-import ru.LevLezhnin.NauJava.properties.QuotaProperties;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
 
+/**
+ * Базовая абстрактная реализация {@link StorageQuotaService}.
+ * <p>
+ * Содержит общую логику создания квот по тарифам из конфигурации.
+ *
+ * @author Лев Лежнин
+ */
 public abstract class AbstractStorageQuotaService implements StorageQuotaService {
 
     private final QuotaProperties quotaProperties;

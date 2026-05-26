@@ -1,0 +1,8 @@
+target/
+.git/
+.idea/
+.kilo/
+*.iml
+Dockerfile
+README.md
+AGENTS.md

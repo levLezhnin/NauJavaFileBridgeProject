@@ -18,18 +18,18 @@ import ru.LevLezhnin.NauJava.dto.file.FileDownloadRequestDto;
 import ru.LevLezhnin.NauJava.dto.file.FileDownloadResponseDto;
 import ru.LevLezhnin.NauJava.dto.file.FileResponseDto;
 import ru.LevLezhnin.NauJava.dto.file.FileUploadRequestDto;
-import ru.LevLezhnin.NauJava.exceptions.StorageQuotaExceededException;
-import ru.LevLezhnin.NauJava.exceptions.common.EntityNotFoundException;
-import ru.LevLezhnin.NauJava.exceptions.common.InvalidPasswordException;
-import ru.LevLezhnin.NauJava.exceptions.file.*;
+import ru.LevLezhnin.NauJava.exception.common.EntityNotFoundException;
+import ru.LevLezhnin.NauJava.exception.common.InvalidPasswordException;
+import ru.LevLezhnin.NauJava.exception.file.*;
+import ru.LevLezhnin.NauJava.exception.storagequotas.StorageQuotaExceededException;
 import ru.LevLezhnin.NauJava.mapper.FileResponseMapper;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.custom.ObjectStorageRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.FileRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.FileStatisticsRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
+import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
-import ru.LevLezhnin.NauJava.utils.RequestContextService;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -103,7 +103,8 @@ class FileServiceImplUnitTest {
                 storageQuotaService,
                 requestContextService,
                 passwordEncoder,
-                new FileResponseMapper()
+                new FileResponseMapper(),
+                List.of()
         );
 
         fileService.setBaseUrl(API_BASE_URL);
