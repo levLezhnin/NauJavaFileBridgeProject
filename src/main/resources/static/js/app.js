@@ -1,4 +1,5 @@
 const publicPaths = ['/', '/login', '/register', '/forbidden'];
+const maxFileSizeBytes = 100 * 1024 * 1024;
 
 function showValidationSummary(message, errors) {
   const summary = document.querySelector('#validationSummary');
@@ -669,7 +670,33 @@ async function handleCopyLink(event) {
       link = window.location.origin + link;
     }
     
-    await navigator.clipboard.writeText(link);
+    // Try modern Clipboard API first
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(link);
+    } else {
+      // Fallback for older browsers or non-secure contexts
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const success = document.execCommand('copy');
+        if (!success) {
+          throw new Error('Не удалось скопировать ссылку. Пожалуйста, скопируйте вручную.');
+        }
+      } catch (execError) {
+        throw new Error('Не удалось скопировать ссылку. Пожалуйста, скопируйте вручную.');
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    }
+    
     button.textContent = '✅ Скопировано!';
     
     setTimeout(() => {
@@ -748,17 +775,17 @@ function validateUploadForm(file, ttl, maxDownloads, password) {
   
   if (!file) {
     errors.push('Выберите файл для загрузки');
-  } else if (file.size > 100 * 1024 * 1024) {
-    errors.push('Размер файла не должен превышать 100 МБ');
+  } else if (file.size > maxFileSizeBytes) {
+    errors.push('Размер файла не должен превышать ' + formatBytes(maxFileSizeBytes));
   }
   
-  // TTL validation in days (1-14)
-  if (isNaN(ttl) || ttl < 1 || ttl > 14) {
-    errors.push('Срок жизни должен быть от 1 до 14 дней');
+  // TTL validation in days (1-14, natural number)
+  if (isNaN(ttl) || ttl < 1 || ttl > 14 || !Number.isInteger(ttl)) {
+    errors.push('Срок жизни должен быть целым числом от 1 до 14 дней');
   }
   
-  if (isNaN(maxDownloads) || maxDownloads < 1 || maxDownloads > 1000) {
-    errors.push('Максимум скачиваний должен быть от 1 до 1000');
+  if (isNaN(maxDownloads) || maxDownloads < 1 || maxDownloads > 1000 || !Number.isInteger(maxDownloads)) {
+    errors.push('Максимум скачиваний должен быть целым числом от 1 до 1000');
   }
   
   if (password && (password.length < 6 || password.length > 64)) {
@@ -871,28 +898,28 @@ function initUploadPage() {
     }
   }
 
-  uploadForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const file = fileInput.files[0];
-    const ttl = parseInt(document.querySelector('#ttl').value);
-    const maxDownloads = parseInt(document.querySelector('#maxDownloads').value);
-    const password = document.querySelector('#password').value || null;
+uploadForm.addEventListener('submit', async (e) => {
+     e.preventDefault();
+     
+     const file = fileInput.files[0];
+     const ttl = parseInt(document.querySelector('#ttl').value);
+     const maxDownloads = parseInt(document.querySelector('#maxDownloads').value);
+     const password = document.querySelector('#password').value || null;
 
-    hideValidationSummary();
-    clearAllFieldErrors(uploadForm);
+     hideValidationSummary();
+     clearAllFieldErrors(uploadForm);
 
-    // Validate form
-    const errors = validateUploadForm(file, ttl, maxDownloads, password);
-    if (errors.length > 0) {
-      showValidationSummary('Пожалуйста, исправьте ошибки в форме');
-      if (!file) showFieldError('dropzone', 'Выберите файл для загрузки');
-      else if (file.size > 100 * 1024 * 1024) showFieldError('dropzone', 'Размер файла не должен превышать 100 МБ');
-      if (isNaN(ttl) || ttl < 1 || ttl > 14) showFieldError('ttl', 'Срок жизни должен быть от 1 до 14 дней');
-      if (isNaN(maxDownloads) || maxDownloads < 1 || maxDownloads > 1000) showFieldError('maxDownloads', 'Максимум скачиваний должен быть от 1 до 1000');
-      if (password && (password.length < 6 || password.length > 64)) showFieldError('password', 'Длина пароля должна быть от 6 до 64 символов');
-      return;
-    }
+     // Validate form
+     const errors = validateUploadForm(file, ttl, maxDownloads, password);
+     if (errors.length > 0) {
+       showValidationSummary('Пожалуйста, исправьте ошибки в форме');
+       if (!file) showFieldError('dropzone', 'Выберите файл для загрузки');
+       else if (file.size > maxFileSizeBytes) showFieldError('dropzone', 'Размер файла не должен превышать ' + formatBytes(maxFileSizeBytes));
+       if (isNaN(ttl) || ttl < 1 || ttl > 14 || ttl % 1 !== 0) showFieldError('ttl', 'Срок жизни должен быть целым числом от 1 до 14 дней');
+       if (isNaN(maxDownloads) || maxDownloads < 1 || maxDownloads > 1000 || maxDownloads % 1 !== 0) showFieldError('maxDownloads', 'Максимум скачиваний должен быть целым числом от 1 до 1000');
+       if (password && (password.length < 6 || password.length > 64)) showFieldError('password', 'Длина пароля должна быть от 6 до 64 символов');
+       return;
+     }
 
     const ttlMinutes = ttl * 24 * 60; // Convert days to minutes
     const button = uploadForm.querySelector('button[type="submit"]');
@@ -917,11 +944,33 @@ function initUploadPage() {
       progressContainer.querySelector('.progress-text').textContent = 'Начинаем загрузку...';
 
       try {
-        await apiFetch('/api/v1/files', {
-          method: 'POST',
-          body: formData,
-          credentials: 'same-origin'
-        });
+         await uploadFileWithProgress(formData, progressContainer);
+         function uploadFileWithProgress(formData, progressContainer) {
+             return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/v1/files');
+                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.withCredentials = true;
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        progressContainer.querySelector('.progress-bar').style.width = percent + '%';
+                        progressContainer.querySelector('.progress-text').textContent = percent === 100 ? '⏳ Обработка на сервере...' : percent + '%';
+                    }
+                });
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve();
+                    } else {
+                        let errMsg = 'Ошибка загрузки файла';
+                        try { const resp = JSON.parse(xhr.responseText); errMsg = resp.message || errMsg; } catch (_) {}
+                        reject(new Error(errMsg));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Сетевая ошибка при загрузке'));
+                xhr.send(formData);
+             });
+        }
 
         showAlert('Файл успешно загружен!', 'success');
         fileInput.value = '';

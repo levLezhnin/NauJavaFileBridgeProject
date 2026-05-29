@@ -43,7 +43,7 @@ public class TokenBlacklistServiceInMemoryImpl implements TokenBlacklistService 
             log.warn("Попытка добавить null-токен в чёрный список");
             return;
         }
-        if (ttl == null || ttl.isNegative()) {
+        if (ttl == null || ttl.isNegative() || ttl.isZero()) {
             log.warn("Попытка добавить в чёрный список токен с некорректным ttl: {}", ttl);
             return;
         }

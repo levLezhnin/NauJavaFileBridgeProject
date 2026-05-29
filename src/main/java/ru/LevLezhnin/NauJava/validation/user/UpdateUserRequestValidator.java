@@ -32,7 +32,7 @@ public class UpdateUserRequestValidator implements ConstraintValidator<UpdateUse
         if (!updateUserRequestDto.containsCurrentPassword()) {
             constraintValidatorContext.disableDefaultConstraintViolation();
             constraintValidatorContext.buildConstraintViolationWithTemplate("Для смены пароля укажите текущий пароль")
-                    .addPropertyNode("currentPassword")
+                    .addPropertyNode("current_password")
                     .addConstraintViolation();
             return false;
         }
@@ -40,7 +40,7 @@ public class UpdateUserRequestValidator implements ConstraintValidator<UpdateUse
         if (!updateUserRequestDto.containsConfirmNewPassword()) {
             constraintValidatorContext.disableDefaultConstraintViolation();
             constraintValidatorContext.buildConstraintViolationWithTemplate("Подтвердите новый пароль")
-                    .addPropertyNode("confirmNewPassword")
+                    .addPropertyNode("confirm_new_password")
                     .addConstraintViolation();
             return false;
         }
@@ -48,7 +48,7 @@ public class UpdateUserRequestValidator implements ConstraintValidator<UpdateUse
         if (!updateUserRequestDto.newPassword().equals(updateUserRequestDto.confirmNewPassword())) {
             constraintValidatorContext.disableDefaultConstraintViolation();
             constraintValidatorContext.buildConstraintViolationWithTemplate("Пароли не совпадают")
-                    .addPropertyNode("confirmNewPassword")
+                    .addPropertyNode("confirm_new_password")
                     .addConstraintViolation();
             return false;
         }

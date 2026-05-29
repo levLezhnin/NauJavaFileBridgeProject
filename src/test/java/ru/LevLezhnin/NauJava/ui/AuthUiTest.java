@@ -3,6 +3,7 @@ package ru.LevLezhnin.NauJava.ui;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -12,10 +13,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import ru.LevLezhnin.NauJava.constants.ContainerVersionConstants;
+import ru.LevLezhnin.NauJava.config.PostgresTestContainers;
 
 import java.time.Duration;
 
@@ -27,11 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("UI-тесты авторизации")
 @ActiveProfiles("test")
-@Testcontainers
+@ExtendWith(PostgresTestContainers.class)
 class AuthUiTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(ContainerVersionConstants.POSTGRES_CONTAINER_VERSION);
 
     @LocalServerPort
     private int port;
@@ -52,7 +47,7 @@ class AuthUiTest {
     private static WebDriverWait wait;
 
     @BeforeAll
-    static void setUpClass(@LocalServerPort int port) {
+    static void setUpClass() {
         WebDriverManager.chromedriver().setup();
 
         ChromeOptions options = new ChromeOptions();
@@ -64,6 +59,17 @@ class AuthUiTest {
 
         driver = new ChromeDriver(options);
         wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+    }
+
+    @AfterAll
+    static void tearDownClass() {
+        if (driver != null) driver.quit();
+    }
+
+    @BeforeEach
+    void setUp() {
+        driver.manage().deleteAllCookies();
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(10));
 
         given()
                 .port(port)
@@ -79,17 +85,6 @@ class AuthUiTest {
                 .post("/api/v1/auth/register")
                 .then()
                 .statusCode(200);
-    }
-
-    @AfterAll
-    static void tearDownClass() {
-        if (driver != null) driver.quit();
-    }
-
-    @BeforeEach
-    void setUp() {
-        driver.manage().deleteAllCookies();
-        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(10));
     }
 
     private String url(String path) {

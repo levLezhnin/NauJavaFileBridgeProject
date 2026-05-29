@@ -1,16 +1,21 @@
 package ru.LevLezhnin.NauJava.controller.admin;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileAdminResponseDto;
 import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import ru.LevLezhnin.NauJava.service.interfaces.UserService;
@@ -46,28 +51,28 @@ public class UserAdminController {
     /**
      * Административный поиск пользователей по различным критериям.
      * <p>
-     * <b>Требования:</b> текущий пользователь должен иметь роль ADMIN.
-     * При неизвестном {@code searchBy} - возвращается 400 (InvalidSearchCriteriaException).
-     * <p>
      * Поддерживаемые критерии см. в реализациях {@link ru.LevLezhnin.NauJava.repository.search.user.UserSearchStrategy}.
-     *
-     * @param searchBy ключ стратегии поиска (например: "username", "email", "role", "active")
-     * @param search   значение для поиска
-     * @param pageSize количество записей на странице (> 0)
-     * @param page     номер страницы (0-based)
-     * @return список DTO профиля пользователя (с ролью и статусом активности)
-     * @throws org.springframework.security.access.AccessDeniedException если не ADMIN
-     * @throws ru.LevLezhnin.NauJava.exception.common.EntityNotFoundException если администратор не найден
-     * @throws ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException при неизвестном searchBy
      */
     @Operation(summary = "Поиск пользователей (админ)", description = "Позволяет администратору искать пользователей по username, email, роли и другим критериям.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Результаты поиска"),
-        @ApiResponse(responseCode = "400", description = "Неверный критерий поиска (InvalidSearchCriteriaException) или параметры"),
-        @ApiResponse(responseCode = "401", description = "Не аутентифицирован"),
-        @ApiResponse(responseCode = "403", description = "Нет прав администратора (AccessDeniedException) или аккаунт заблокирован"),
-        @ApiResponse(responseCode = "404", description = "Администратор не найден (EntityNotFoundException)"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+        @ApiResponse(responseCode = "200",
+                     description = "Результаты поиска",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = UserProfileAdminResponseDto.class)))),
+        @ApiResponse(responseCode = "400",
+                     description = "Неверный критерий поиска или параметры",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "401",
+                     description = "Не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Нет прав администратора или аккаунт заблокирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404",
+                     description = "Администратор не найден",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping
     public List<UserProfileAdminResponseDto> findAllByCriteria(@RequestParam("searchBy") String searchBy,

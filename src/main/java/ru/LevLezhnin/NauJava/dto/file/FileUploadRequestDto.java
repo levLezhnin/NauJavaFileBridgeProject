@@ -37,7 +37,7 @@ public record FileUploadRequestDto(
         String contentType,
 
         @NotNull(message = "Размер файла не может быть null")
-        @Positive
+        @Positive(message = "Файл должен быть непустым")
         Long fileSize,
 
         @NotNull(message = "Время жизни файла не может быть null")
@@ -45,7 +45,7 @@ public record FileUploadRequestDto(
         Long ttlMinutes,
 
         @NotNull(message = "Максимальное количество скачиваний файла не может быть null")
-        @Positive
+        @Positive(message = "Максимальное количество скачиваний файла должно быть больше 0")
         Long maxDownloads,
 
         @FilePasswordValid

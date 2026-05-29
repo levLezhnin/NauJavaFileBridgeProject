@@ -1,122 +1,177 @@
 package ru.LevLezhnin.NauJava.repository.custom;
 
-import io.minio.BucketExistsArgs;
-import io.minio.MakeBucketArgs;
-import io.minio.MinioClient;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import ru.LevLezhnin.NauJava.constants.ContainerVersionConstants;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import ru.LevLezhnin.NauJava.config.MinIOTestContainers;
+import ru.LevLezhnin.NauJava.exception.file.FileStorageException;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.util.List;
+import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Testcontainers
+@SpringBootTest
+@ActiveProfiles("test")
+@ExtendWith(MinIOTestContainers.class)
+@DisplayName("Интеграционные тесты MinioStorageRepositoryImpl")
 class MinioObjectStorageRepositoryIntegrationTest {
 
-    private static final String ACCESS_KEY = "minioadmin";
-    private static final String SECRET_KEY = "minioadmin";
-    private static final String BUCKET = "file-bucket";
+    @Autowired
+    @Qualifier("fileStorageRepository")
+    private ObjectStorageRepository repository;
 
-    @Container
-    static GenericContainer<?> minio =
-            new GenericContainer<>(ContainerVersionConstants.MINIO_CONTAINER_VERSION)
-                    .withEnv("MINIO_ROOT_USER", ACCESS_KEY)
-                    .withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
-                    .withCommand("server /data")
-                    .withExposedPorts(9000)
-                    .waitingFor(
-                            org.testcontainers.containers.wait.strategy.Wait
-                                    .forHttp("/minio/health/live")
-                                    .forPort(9000)
-                    );
+    private String uniquePrefix;
 
-    static MinioStorageRepositoryImpl repository;
+    @BeforeEach
+    void setUp() {
+        uniquePrefix = "test-" + UUID.randomUUID() + "/";
+    }
 
-    @BeforeAll
-    static void setup() throws Exception {
-        String endpoint = "http://" + minio.getHost() + ":" + minio.getMappedPort(9000);
+    @Nested
+    @DisplayName("uploadWithPath")
+    class UploadTests {
+        @Test
+        @DisplayName("Позитивный: загрузка и скачивание файла")
+        void shouldUploadAndDownloadFile() throws Exception {
+            String path = uniquePrefix + "file.txt";
+            byte[] data = "hello-minio".getBytes();
 
-        MinioClient client = MinioClient.builder()
-                .endpoint(endpoint)
-                .credentials(ACCESS_KEY, SECRET_KEY)
-                .build();
+            repository.uploadWithPath(path, new ByteArrayInputStream(data), data.length, MediaType.TEXT_PLAIN_VALUE);
+            InputStream downloaded = repository.downloadByPath(path);
+            byte[] result = downloaded.readAllBytes();
 
-        // создаём бакет
-        boolean exists = client.bucketExists(
-                BucketExistsArgs.builder().bucket(BUCKET).build()
-        );
-
-        if (!exists) {
-            client.makeBucket(
-                    MakeBucketArgs.builder().bucket(BUCKET).build()
-            );
+            assertThat(result).isEqualTo(data);
         }
 
-        repository = new MinioStorageRepositoryImpl(
-                client,
-                BUCKET);
+        @Test
+        @DisplayName("Позитивный: fallback на octet-stream при невалидном MIME-типе")
+        void shouldFallbackToOctetStreamForInvalidMimeType() throws Exception {
+            String path = uniquePrefix + "fallback.bin";
+            byte[] data = "binary-data".getBytes();
+
+            repository.uploadWithPath(path, new ByteArrayInputStream(data), data.length, "invalid/mime/type");
+
+            try (InputStream is = repository.downloadByPath(path)) {
+                assertThat(is.readAllBytes()).isEqualTo(data);
+            }
+        }
+
+        @Test
+        @DisplayName("Негативный: выбрасывает IllegalArgumentException при null path")
+        void shouldThrowWhenPathIsNull() {
+            assertThatThrownBy(() -> repository.uploadWithPath(null, new ByteArrayInputStream(new byte[0]), 1, MediaType.TEXT_PLAIN_VALUE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Путь к файлу не может быть пустым");
+        }
+
+        @Test
+        @DisplayName("Негативный: выбрасывает IllegalArgumentException при size <= 0")
+        void shouldThrowWhenSizeIsInvalid() {
+            assertThatThrownBy(() -> repository.uploadWithPath("path", new ByteArrayInputStream(new byte[0]), 0, MediaType.TEXT_PLAIN_VALUE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Размер файла должен быть положительным");
+        }
     }
 
-    @Test
-    void uploadAndDownloadFile() throws Exception {
-        String path = "test/file.txt";
-        byte[] data = "hello-minio".getBytes();
+    @Nested
+    @DisplayName("downloadByPath & fileExistsByPath")
+    class ReadTests {
+        @Test
+        @DisplayName("Позитивный: fileExistsByPath возвращает true после загрузки")
+        void shouldReturnTrueWhenFileExists() {
+            String path = uniquePrefix + "exists.txt";
+            repository.uploadWithPath(path, new ByteArrayInputStream("data".getBytes()), 4, null);
+            assertThat(repository.fileExistsByPath(path)).isTrue();
+        }
 
-        repository.uploadWithPath(
-                path,
-                new ByteArrayInputStream(data),
-                data.length,
-                "text/plain"
-        );
+        @Test
+        @DisplayName("Позитивный: fileExistsByPath возвращает false для несуществующего файла")
+        void shouldReturnFalseWhenFileNotExists() {
+            assertThat(repository.fileExistsByPath(uniquePrefix + "ghost.txt")).isFalse();
+        }
 
-        InputStream downloaded = repository.downloadByPath(path);
-        byte[] result = downloaded.readAllBytes();
-
-        assertArrayEquals(data, result);
+        @Test
+        @DisplayName("Негативный: downloadByPath выбрасывает FileStorageException для missing file")
+        void shouldThrowWhenDownloadingMissingFile() {
+            assertThatThrownBy(() -> repository.downloadByPath(uniquePrefix + "missing.txt"))
+                    .isInstanceOf(FileStorageException.class)
+                    .hasMessageContaining("Не найден файл по пути: ");
+        }
     }
 
-    @Test
-    void fileExists_shouldReturnTrue() {
-        String path = "exists/test.txt";
-        byte[] data = "data".getBytes();
+    @Nested
+    @DisplayName("findFileSizeBytesByPath")
+    class SizeTests {
+        @Test
+        @DisplayName("Позитивный: возвращает корректный размер")
+        void shouldReturnCorrectSize() {
+            String path = uniquePrefix + "size.bin";
+            byte[] data = new byte[1024];
+            repository.uploadWithPath(path, new ByteArrayInputStream(data), data.length, null);
 
-        repository.uploadWithPath(path, new ByteArrayInputStream(data), data.length, null);
+            assertThat(repository.findFileSizeBytesByPath(path)).isEqualTo(1024L);
+        }
 
-        assertTrue(repository.fileExistsByPath(path));
+        @Test
+        @DisplayName("Негативный: выбрасывает FileStorageException для несуществующего файла")
+        void shouldThrowWhenGettingSizeOfMissingFile() {
+            assertThatThrownBy(() -> repository.findFileSizeBytesByPath(uniquePrefix + "no_size.txt"))
+                    .isInstanceOf(FileStorageException.class)
+                    .hasMessageContaining("Не найден файл по пути: ");
+        }
     }
 
-    @Test
-    void findFileSize_shouldReturnCorrectSize() {
-        String path = "size/file.bin";
-        byte[] data = new byte[1024];
+    @Nested
+    @DisplayName("deleteByPath & deleteAllByPathsInBatch")
+    class DeleteTests {
+        @Test
+        @DisplayName("Позитивный: одиночное удаление")
+        void shouldDeleteSingleFile() {
+            String path = uniquePrefix + "delete_single.txt";
+            repository.uploadWithPath(path, new ByteArrayInputStream("delete-me".getBytes()), 9, null);
+            repository.deleteByPath(path);
 
-        repository.uploadWithPath(path, new ByteArrayInputStream(data), data.length, null);
+            assertThat(repository.fileExistsByPath(path)).isFalse();
+        }
 
-        long size = repository.findFileSizeBytesByPath(path);
+        @Test
+        @DisplayName("Позитивный: пакетное удаление успешно удаляет все файлы")
+        void shouldDeleteAllByPathsInBatch() {
+            String path1 = uniquePrefix + "batch1.txt";
+            String path2 = uniquePrefix + "batch2.txt";
+            repository.uploadWithPath(path1, new ByteArrayInputStream("1".getBytes()), 1, null);
+            repository.uploadWithPath(path2, new ByteArrayInputStream("2".getBytes()), 1, null);
 
-        assertEquals(1024, size);
-    }
+            repository.deleteAllByPathsInBatch(List.of(path1, path2));
 
-    @Test
-    void deleteFile_shouldRemoveFile() {
-        String path = "delete/file.txt";
-        byte[] data = "delete-me".getBytes();
+            assertThat(repository.fileExistsByPath(path1)).isFalse();
+            assertThat(repository.fileExistsByPath(path2)).isFalse();
+        }
 
-        repository.uploadWithPath(path, new ByteArrayInputStream(data), data.length, null);
+        @Test
+        @DisplayName("Негативный: пакетное удаление игнорирует null/пустой список")
+        void shouldIgnoreNullOrEmptyPathsInBatch() {
+            repository.deleteAllByPathsInBatch(null);
+            repository.deleteAllByPathsInBatch(List.of());
+            // Ожидается отсутствие исключений
+        }
 
-        repository.deleteByPath(path);
-
-        assertFalse(repository.fileExistsByPath(path));
-    }
-
-    @Test
-    void downloadMissingFile_shouldThrowException() {
-        assertThrows(Exception.class,
-                () -> repository.downloadByPath("missing/file.txt"));
+        @Test
+        @DisplayName("Позитивный: удаление несуществующего файла не кидает исключение (idempotent)")
+        void shouldNotThrowWhenDeletingNonExistentFile() {
+            repository.deleteByPath(uniquePrefix + "already_gone.txt");
+            // Идемпотентность: не должно кидать исключение
+        }
     }
 }

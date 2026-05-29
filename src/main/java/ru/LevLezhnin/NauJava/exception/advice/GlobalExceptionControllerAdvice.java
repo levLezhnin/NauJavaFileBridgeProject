@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -12,8 +13,10 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
 import ru.LevLezhnin.NauJava.dto.error.FieldError;
 import ru.LevLezhnin.NauJava.dto.error.ValidationError;
@@ -119,6 +122,46 @@ public class GlobalExceptionControllerAdvice extends AbstractControllerAdvice {
                 .collect(Collectors.toList());
 
         return buildValidationErrorResponse(fieldErrors, request);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<ValidationError> handleValidationException(HandlerMethodValidationException ex, HttpServletRequest request) {
+
+        List<FieldError> fieldErrors = ex.getAllErrors()
+                .stream()
+                .map(err -> {
+                    String fieldName = parseFieldNameFromErrorCode(err);
+                    return new FieldError(
+                        fieldName,
+                        err.getDefaultMessage());
+                })
+                .collect(Collectors.toList());
+
+        return buildValidationErrorResponse(fieldErrors, request);
+    }
+
+    /**
+     * Парсит имя поля из кода ошибки валидации.
+     * <p>
+     * Коды имеют формат: "AnnotationName.paramName.fieldName"
+     * Например: "NotBlank.updateUserRequestDto.newPassword" -> "newPassword"
+     */
+    private String parseFieldNameFromErrorCode(MessageSourceResolvable error) {
+        if (error.getCodes() != null && error.getCodes().length > 0) {
+            String code = error.getCodes()[0];
+            String[] parts = code.split("\\.");
+            if (parts.length >= 2) {
+                String candidate = parts[parts.length - 1];
+                if (!candidate.matches("^(java|lang|String|Object|jakarta|validation|constraints)$")) {
+                    return candidate;
+                }
+                if (parts.length >= 3) {
+                    return parts[parts.length - 2];
+                }
+            }
+        }
+        return "request";
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

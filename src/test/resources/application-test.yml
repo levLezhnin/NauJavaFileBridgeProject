@@ -3,10 +3,14 @@ spring:
     url: jdbc:tc:postgresql:16-alpine:///testdb
     username: test
     password: test
+    hikari:
+      max-lifetime: 30000
+      connection-timeout: 20000
+      validation-timeout: 5000
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: none
     show-sql: true
     properties:
       hibernate:
@@ -19,7 +23,7 @@ minio:
   secretKey: test-secret-key
   buckets:
     fileBucket:
-      name: test-files
+      name: test-bucket
 
 app:
   api:
@@ -31,8 +35,18 @@ app:
       password: DeF@uLtADm1N_P@sswOrd
       quota-size: 100GB
 
+jwt:
+  accessSecret: CIhBglHDaXv4SNpDvcX7eTlmAjOpiYXB6OXO4AUF4fS
+  refreshSecret: 13gN0Pyw7n2GNzXrqTn2ku8ByWNyE2GkiJWzGMVfOCs
+  accessTokenLifetime: 30m
+  refreshTokenLifetime: 1d
+
 management:
   endpoints:
     web:
       exposure:
         include: "*"
+logging:
+  level:
+    org.springframework.test.context.jdbc: DEBUG
+    org.springframework.jdbc: DEBUG

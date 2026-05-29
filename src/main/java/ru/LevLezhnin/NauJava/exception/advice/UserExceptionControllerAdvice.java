@@ -47,7 +47,7 @@ public class UserExceptionControllerAdvice extends AbstractControllerAdvice {
     @ExceptionHandler(UserAlreadyBannedException.class)
     public ResponseEntity<ErrorResponse> handleUserAlreadyBanned(UserAlreadyBannedException ex, HttpServletRequest httpServletRequest) {
         return buildResponse(
-                HttpStatus.BAD_REQUEST,
+                HttpStatus.CONFLICT,
                 "Пользователь уже заблокирован",
                 ex.getMessage(),
                 httpServletRequest);

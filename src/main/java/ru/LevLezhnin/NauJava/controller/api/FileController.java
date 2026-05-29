@@ -1,6 +1,9 @@
 package ru.LevLezhnin.NauJava.controller.api;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +19,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
+import ru.LevLezhnin.NauJava.dto.error.ValidationError;
 import ru.LevLezhnin.NauJava.dto.file.*;
 import ru.LevLezhnin.NauJava.exception.file.FileUploadException;
 import ru.LevLezhnin.NauJava.security.context.RequestContextService;
@@ -58,23 +63,33 @@ public class FileController {
      * Загрузка нового файла.
      * <p>
      * Поддерживает multipart/form-data. Метаданные передаются в части "payload", сам файл - в части "file".
-     *
-     * @param multipartFile                  загружаемый файл
-     * @param fileUploadWebRequestPayloadDto метаданные (TTL, maxDownloads, пароль)
-     * @return метаданные загруженного файла
      */
     @Operation(
         summary = "Загрузить файл",
         description = "Загружает файл в объектное хранилище с указанными ограничениями по времени жизни и количеству скачиваний."
     )
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Файл успешно загружен"),
-        @ApiResponse(responseCode = "400", description = "Ошибка валидации (ConstraintViolationException, MethodArgumentNotValidException), некорректный JSON, слишком большой файл (MaxUploadSizeExceededException)"),
-        @ApiResponse(responseCode = "401", description = "Пользователь не аутентифицирован (AuthenticationCredentialsNotFoundException, InvalidTokenException и т.д.)"),
-        @ApiResponse(responseCode = "403", description = "Доступ запрещён (бан пользователя через UserBanFilter, AccessDeniedException)"),
-        @ApiResponse(responseCode = "404", description = "Пользователь не найден (EntityNotFoundException, race condition)"),
-        @ApiResponse(responseCode = "422", description = "Превышена квота хранилища (StorageQuotaExceededException)"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка: FileUploadException, FileStorageException, IllegalStateException, непредвиденные Exception")
+        @ApiResponse(responseCode = "201",
+                     description = "Файл успешно загружен",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = FileResponseDto.class))),
+        @ApiResponse(responseCode = "400",
+                     description = "Ошибка валидации, некорректный JSON, слишком большой файл",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(anyOf = { ErrorResponse.class, ValidationError.class }))),
+        @ApiResponse(responseCode = "401",
+                     description = "Пользователь не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Доступ запрещён",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404",
+                     description = "Пользователь не найден",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "422",
+                     description = "Превышена квота хранилища",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -110,19 +125,25 @@ public class FileController {
     }
 
     /**
-     * Получение списка своих файлов (постранично).
-     *
-     * @param page     номер страницы (0-based)
-     * @param pageSize количество записей на странице
-     * @return список метаданных файлов текущего пользователя
+     * Получение списка своих файлов. Поддерживается пагинация.
      */
     @Operation(summary = "Мои файлы", description = "Возвращает постраничный список файлов текущего пользователя")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Список файлов успешно возвращён"),
-        @ApiResponse(responseCode = "400", description = "Некорректные параметры пагинации (IllegalArgumentException)"),
-        @ApiResponse(responseCode = "401", description = "Не аутентифицирован"),
-        @ApiResponse(responseCode = "403", description = "Доступ запрещён (бан)"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+        @ApiResponse(responseCode = "200",
+                     description = "Список файлов успешно возвращён",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, array = @ArraySchema(schema = @Schema(implementation = FileResponseDto.class)))),
+        @ApiResponse(responseCode = "400",
+                     description = "Некорректные параметры пагинации",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "401",
+                     description = "Не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Доступ запрещён (бан)",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/my")
     @ResponseStatus(HttpStatus.OK)
@@ -138,12 +159,21 @@ public class FileController {
      */
     @Operation(summary = "Метаданные файла", description = "Возвращает информацию о файле (имя, размер, даты, количество скачиваний и т.д.)")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Метаданные файла успешно возвращены"),
-        @ApiResponse(responseCode = "400", description = "Некорректный UUID файла"),
-        @ApiResponse(responseCode = "401", description = "Не аутентифицирован"),
-        @ApiResponse(responseCode = "403", description = "Доступ запрещён (бан или нет прав)"),
-        @ApiResponse(responseCode = "404", description = "Файл не найден (FileNotFoundException, EntityNotFoundException)"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+        @ApiResponse(responseCode = "200",
+                     description = "Метаданные файла успешно возвращены",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = FileResponseDto.class))),
+        @ApiResponse(responseCode = "401",
+                     description = "Не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Доступ запрещён (бан или нет прав)",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404",
+                     description = "Файл не найден",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{fileId}")
     @ResponseStatus(HttpStatus.OK)
@@ -158,13 +188,24 @@ public class FileController {
      */
     @Operation(summary = "Получить ссылку на скачивание", description = "Генерирует постоянную ссылку для скачивания. Доступно только владельцу файла.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Ссылка успешно сформирована"),
-        @ApiResponse(responseCode = "400", description = "Некорректный UUID (FileNotFoundException)"),
-        @ApiResponse(responseCode = "401", description = "Не аутентифицирован"),
-        @ApiResponse(responseCode = "403", description = "Нет прав (не владелец - IllegalFileAccessException) или бан"),
-        @ApiResponse(responseCode = "404", description = "Файл не найден (EntityNotFoundException, FileNotFoundException)"),
-        @ApiResponse(responseCode = "410", description = "Файл просрочен (FileExpiredException) или исчерпан лимит (DownloadLimitExceededException)"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+        @ApiResponse(responseCode = "200",
+                     description = "Ссылка успешно сформирована",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = FileDownloadLinkResponseDto.class))),
+        @ApiResponse(responseCode = "401",
+                     description = "Не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Нет прав или бан",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404",
+                     description = "Файл не найден",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "410",
+                     description = "Файл просрочен или исчерпан лимит",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/link/{fileId}")
     @ResponseStatus(HttpStatus.OK)
@@ -179,13 +220,27 @@ public class FileController {
      */
     @Operation(summary = "Скачать файл", description = "Выполняет скачивание файла. При наличии пароля - требуется его передача в теле запроса.")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Файл успешно скачан"),
-        @ApiResponse(responseCode = "400", description = "Неверный пароль (InvalidPasswordException), некорректный JSON или запрос"),
-        @ApiResponse(responseCode = "401", description = "Не аутентифицирован"),
-        @ApiResponse(responseCode = "403", description = "Нет прав на файл (IllegalFileAccessException) или бан аккаунта"),
-        @ApiResponse(responseCode = "404", description = "Файл не найден (FileNotFoundException, EntityNotFoundException)"),
-        @ApiResponse(responseCode = "410", description = "Файл просрочен (FileExpiredException) или исчерпан лимит скачиваний (DownloadLimitExceededException)"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера (FileStorageException и др.)")
+        @ApiResponse(responseCode = "200",
+                     description = "Файл успешно скачан",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = Resource.class))),
+        @ApiResponse(responseCode = "400",
+                     description = "Неверный пароль, некорректный JSON или запрос",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "401",
+                     description = "Не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Нет прав на файл или бан аккаунта",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404",
+                     description = "Файл не найден",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "410",
+                     description = "Файл просрочен или исчерпан лимит скачиваний",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/download")
     @ResponseStatus(HttpStatus.OK)
@@ -210,12 +265,21 @@ public class FileController {
      */
     @Operation(summary = "Удалить файл", description = "Удаляет файл из хранилища и возвращает квоту владельцу.")
     @ApiResponses({
-        @ApiResponse(responseCode = "204", description = "Файл успешно удалён"),
-        @ApiResponse(responseCode = "400", description = "Некорректный UUID"),
-        @ApiResponse(responseCode = "401", description = "Не аутентифицирован"),
-        @ApiResponse(responseCode = "403", description = "Нет прав на удаление (IllegalFileAccessException: не владелец и не админ) или бан"),
-        @ApiResponse(responseCode = "404", description = "Файл не найден (EntityNotFoundException) или пользователь не найден"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера (при удалении из хранилища ошибки логируются, но операция продолжается)")
+        @ApiResponse(responseCode = "204",
+                     description = "Файл успешно удалён",
+                     content = @Content),
+        @ApiResponse(responseCode = "401",
+                     description = "Не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Нет прав на удаление или бан",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404",
+                     description = "Файл не найден или пользователь не найден",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/{fileId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

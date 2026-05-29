@@ -30,6 +30,7 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 200MB
+      file-size-threshold: 100MB
 
   error:
     whitelabel:
@@ -58,7 +59,7 @@ app:
   quotas:
     tariffs:
       BASIC:
-        maxStorageSize: 1GB
+        maxStorageSize: 10GB
 
   default:
     default-admin:

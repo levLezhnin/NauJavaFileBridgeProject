@@ -20,6 +20,7 @@ import ru.LevLezhnin.NauJava.exception.common.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.exception.common.InvalidPasswordException;
 import ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException;
 import ru.LevLezhnin.NauJava.exception.file.*;
+import ru.LevLezhnin.NauJava.exception.storagequotas.StorageQuotaExceededException;
 import ru.LevLezhnin.NauJava.mapper.Mapper;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.custom.ObjectStorageRepository;
@@ -115,7 +116,6 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
     public FileResponseDto uploadFile(FileUploadRequestDto fileUploadRequestDto, InputStream fileDataStream) {
 
         Long authorId = getCurrentUserId();
@@ -130,8 +130,6 @@ public class FileServiceImpl implements FileService {
         Instant expireAt = uploadedAt.plus(Duration.ofMinutes(fileUploadRequestDto.ttlMinutes()));
         String passwordHash = isPasswordNotProvided(fileUploadRequestDto.password()) ? null : passwordEncoder.encode(fileUploadRequestDto.password());
 
-        storageQuotaService.updateStorageQuota(storageQuota.getId(), fileUploadRequestDto.fileSize());
-
         fileStorageRepository.uploadWithPath(
                 objectStorageFilePath,
                 fileDataStream,
@@ -139,27 +137,37 @@ public class FileServiceImpl implements FileService {
                 MediaType.APPLICATION_OCTET_STREAM_VALUE
         );
 
-        FileStatistics fileStatistics = FileStatistics.builder()
-                .setTimesDownloaded(0L)
-                .setSizeBytes(fileUploadRequestDto.fileSize())
-                .build();
-
-        File file = File.builder()
-                .setId(fileId)
-                .setPath(objectStorageFilePath)
-                .setName(fileUploadRequestDto.fileName())
-                .setMimeType(fileUploadRequestDto.contentType())
-                .setUploadedAt(uploadedAt)
-                .setExpireAt(expireAt)
-                .setMaxDownloads(fileUploadRequestDto.maxDownloads())
-                .setPasswordHash(passwordHash)
-                .setAuthor(author)
-                .setFileStatistics(fileStatistics)
-                .build();
-
         try {
-            fileStatisticsRepository.save(fileStatistics);
-            fileRepository.save(file);
+            return transactionTemplate.execute(status -> {
+                storageQuotaService.updateStorageQuota(storageQuota.getId(), fileUploadRequestDto.fileSize());
+
+                FileStatistics fileStatistics = FileStatistics.builder()
+                        .setTimesDownloaded(0L)
+                        .setSizeBytes(fileUploadRequestDto.fileSize())
+                        .build();
+
+                File file = File.builder()
+                        .setId(fileId)
+                        .setPath(objectStorageFilePath)
+                        .setName(fileUploadRequestDto.fileName())
+                        .setMimeType(fileUploadRequestDto.contentType())
+                        .setUploadedAt(uploadedAt)
+                        .setExpireAt(expireAt)
+                        .setMaxDownloads(fileUploadRequestDto.maxDownloads())
+                        .setPasswordHash(passwordHash)
+                        .setAuthor(author)
+                        .setFileStatistics(fileStatistics)
+                        .build();
+
+                fileStatisticsRepository.save(fileStatistics);
+                fileRepository.save(file);
+
+                log.info("Файл успешно загружен. ID файла: {}, ID пользователя, загрузившего файл: {}, Имя файла: {}, Размер файла в байтах: {}, TTL файла в минутах: {}",
+                        fileId, authorId, fileUploadRequestDto.fileName(),
+                        fileUploadRequestDto.fileSize(), fileUploadRequestDto.ttlMinutes());
+
+                return fileResponseDtoMapper.map(file);
+            });
         } catch (Exception e) {
             log.error("Ошибка сохранения метаданных файла: ID файла: {}, ID пользователя: {}, Путь до файла: {}",
                 fileId, authorId, objectStorageFilePath, e);
@@ -168,14 +176,12 @@ public class FileServiceImpl implements FileService {
             } catch (Exception cleanUpEx) {
                 log.error("Не удалось удалить загруженный в объектное хранилище файл. Путь: {}", objectStorageFilePath, cleanUpEx);
             }
+
+            if (e instanceof StorageQuotaExceededException sqe) {
+                throw sqe;
+            }
             throw new FileUploadException("Ошибка сохранения метаданных файла", e);
         }
-
-        log.info("Файл успешно загружен. ID файла: {}, ID пользователя, загрузившего файл: {}, Имя файла: {}, Размер файла в байтах: {}, TTL файла в минутах: {}",
-                fileId, authorId, fileUploadRequestDto.fileName(),
-                fileUploadRequestDto.fileSize(), fileUploadRequestDto.ttlMinutes());
-
-        return fileResponseDtoMapper.map(file);
     }
 
     @Override
@@ -245,31 +251,31 @@ public class FileServiceImpl implements FileService {
     private File getEntityById(String fileId) {
 
         if (!isValidId(fileId)) {
-            throw new FileNotFoundException("Файл с id: '%s' не найден".formatted(fileId));
+            throw new FileNotFoundException("Файл с таким id не найден");
         }
 
         return fileRepository.findById(UUID.fromString(fileId))
-                .orElseThrow(() -> new EntityNotFoundException("Файл с id: %s не найден".formatted(fileId)));
+                .orElseThrow(() -> new EntityNotFoundException("Файл с таким id не найден"));
     }
 
     private File getEntityWithDetailsById(String fileId) {
 
         if (!isValidId(fileId)) {
-            throw new FileNotFoundException("Файл с id: '%s' не найден".formatted(fileId));
+            throw new FileNotFoundException("Файл с таким id не найден");
         }
 
         return fileRepository.findWithDetailsById(UUID.fromString(fileId))
-                .orElseThrow(() -> new EntityNotFoundException("Файл с id: %s не найден".formatted(fileId)));
+                .orElseThrow(() -> new EntityNotFoundException("Файл с таким id не найден"));
     }
 
     private File getEntityByIdWithDetailsWithLock(String fileId) {
 
         if (!isValidId(fileId)) {
-            throw new FileNotFoundException("Файл с id: '%s' не найден".formatted(fileId));
+            throw new FileNotFoundException("Файл с таким id не найден");
         }
 
         return fileRepository.findForUpdateWithDetailsById(UUID.fromString(fileId))
-                .orElseThrow(() -> new EntityNotFoundException("Файл с id: %s не найден".formatted(fileId)));
+                .orElseThrow(() -> new EntityNotFoundException("Файл с таким id не найден"));
     }
 
     @Override

@@ -1,15 +1,19 @@
 package ru.LevLezhnin.NauJava.controller.api;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
 import ru.LevLezhnin.NauJava.dto.storageQuotas.StorageQuotaResponseDto;
 import ru.LevLezhnin.NauJava.security.context.RequestContextService;
 import ru.LevLezhnin.NauJava.service.interfaces.StorageQuotaService;
@@ -39,11 +43,21 @@ public class StorageQuotaController {
      */
     @Operation(summary = "Моя квота хранилища", description = "Возвращает использованный и максимальный объём хранилища текущего пользователя")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Квота успешно возвращена"),
-        @ApiResponse(responseCode = "401", description = "Не аутентифицирован"),
-        @ApiResponse(responseCode = "403", description = "Доступ запрещён (пользователь заблокирован)"),
-        @ApiResponse(responseCode = "404", description = "Квота не найдена (EntityNotFoundException)"),
-        @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+        @ApiResponse(responseCode = "200",
+                     description = "Квота успешно возвращена",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = StorageQuotaResponseDto.class))),
+        @ApiResponse(responseCode = "401",
+                     description = "Не аутентифицирован",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403",
+                     description = "Доступ запрещён (пользователь заблокирован)",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "404",
+                     description = "Квота не найдена",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "500",
+                     description = "Внутренняя ошибка сервера",
+                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/my")
     public StorageQuotaResponseDto getCurrentUserStorageQuota() {

@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserBanServiceImpl")
-class UserBanServiceImplTest {
+class UserBanServiceImplUnitTest {
 
     @Mock
     private UserRepository userRepository;

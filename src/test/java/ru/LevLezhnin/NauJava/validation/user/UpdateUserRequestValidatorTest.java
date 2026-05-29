@@ -65,7 +65,7 @@ class UpdateUserRequestValidatorTest extends ValidationBaseTest<UpdateUserReques
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(context).buildConstraintViolationWithTemplate(messageCaptor.capture());
         assertEquals("Для смены пароля укажите текущий пароль", messageCaptor.getValue().trim());
-        verify(builder).addPropertyNode("currentPassword");
+        verify(builder).addPropertyNode("current_password");
     }
 
     @Test
@@ -80,7 +80,7 @@ class UpdateUserRequestValidatorTest extends ValidationBaseTest<UpdateUserReques
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(context).buildConstraintViolationWithTemplate(messageCaptor.capture());
         assertEquals("Подтвердите новый пароль", messageCaptor.getValue().trim());
-        verify(builder).addPropertyNode("confirmNewPassword");
+        verify(builder).addPropertyNode("confirm_new_password");
     }
 
     @Test
@@ -97,6 +97,6 @@ class UpdateUserRequestValidatorTest extends ValidationBaseTest<UpdateUserReques
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(context).buildConstraintViolationWithTemplate(messageCaptor.capture());
         assertEquals("Пароли не совпадают", messageCaptor.getValue().trim());
-        verify(builder).addPropertyNode("confirmNewPassword");
+        verify(builder).addPropertyNode("confirm_new_password");
     }
 }

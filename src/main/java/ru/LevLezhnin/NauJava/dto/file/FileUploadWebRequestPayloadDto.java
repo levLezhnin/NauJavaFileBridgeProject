@@ -27,7 +27,7 @@ public record FileUploadWebRequestPayloadDto(
         Long ttlMinutes,
 
         @NotNull(message = "Максимальное количество скачиваний файла не может быть null")
-        @Positive
+        @Positive(message = "Максимальное количество скачивание файла должно быть больше 0")
         @JsonProperty("max_downloads")
         Long maxDownloads,
 
