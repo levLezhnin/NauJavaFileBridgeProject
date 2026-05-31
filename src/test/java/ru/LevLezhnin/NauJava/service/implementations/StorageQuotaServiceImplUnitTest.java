@@ -1,5 +1,6 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -11,6 +12,7 @@ import ru.LevLezhnin.NauJava.config.properties.QuotaProperties;
 import ru.LevLezhnin.NauJava.dto.storageQuotas.StorageQuotaResponseDto;
 import ru.LevLezhnin.NauJava.exception.common.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.exception.storagequotas.StorageQuotaExceededException;
+import ru.LevLezhnin.NauJava.metrics.StorageQuotaMetrics;
 import ru.LevLezhnin.NauJava.model.StorageQuota;
 import ru.LevLezhnin.NauJava.model.User;
 import ru.LevLezhnin.NauJava.repository.jpa.StorageQuotaRepository;
@@ -52,7 +54,8 @@ class StorageQuotaServiceImplUnitTest {
         storageQuotaService = new StorageQuotaServiceImpl(
                 quotaProperties,
                 storageQuotaRepository,
-                requestContextService
+                requestContextService,
+                new StorageQuotaMetrics(new SimpleMeterRegistry())
         );
 
         testUser = User.builder()

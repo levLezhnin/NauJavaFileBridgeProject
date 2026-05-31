@@ -10,10 +10,32 @@ management:
     web:
       exposure:
         include: "*"
+
+  metrics:
+    enable:
+      spring.batch: true
+      hikaricp: true
+    tags:
+      application: ${spring.application.name:file-bridge}
+
   endpoint:
+    prometheus:
+      enabled: true
     health:
       show-details: always
 
 app:
   api:
-    base-url: ${API_BASE_URL:http://localhost:8080}
+    base-url: http://localhost:8080
+  grafana:
+    url: http://localhost:3000
+
+logging:
+  file:
+    name: logs/file-bridge.log
+    max-size: 10MB
+    max-history: 10
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

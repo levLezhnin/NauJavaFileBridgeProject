@@ -1,23 +1,34 @@
 package ru.LevLezhnin.NauJava.exception.advice;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.apache.catalina.connector.ClientAbortException;
+import org.apache.tomcat.util.http.fileupload.impl.SizeLimitExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import ru.LevLezhnin.NauJava.dto.error.ErrorResponse;
 import ru.LevLezhnin.NauJava.exception.file.*;
+
+import java.io.EOFException;
 
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class FileExceptionControllerAdvice extends AbstractControllerAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(FileExceptionControllerAdvice.class);
+
+    @Value("${spring.servlet.multipart.max-file-size}")
+    private DataSize maxFileSize;
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleFileTooLarge(MaxUploadSizeExceededException e, HttpServletRequest httpServletRequest) {
@@ -112,4 +123,53 @@ public class FileExceptionControllerAdvice extends AbstractControllerAdvice {
         );
     }
 
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(
+            AsyncRequestNotUsableException ex,
+            HttpServletRequest request) {
+
+        log.warn("Скачивание файла было прервано. URI: {}, причина: {}", request.getRequestURI(), ex.getMessage());
+    }
+
+    @ExceptionHandler(ClientAbortException.class)
+    public void handleClientAbort(
+            ClientAbortException ex,
+            HttpServletRequest request) {
+
+        log.warn("Клиент разорвал соединение. URI: {}, причина: {}", request.getRequestURI(), ex.getMessage());
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipartException(
+            MultipartException ex,
+            HttpServletRequest request) {
+
+        Throwable root = ex.getRootCause();
+
+        if (root instanceof ClientAbortException || root instanceof EOFException) {
+            log.warn("Клиент прервал загрузку файла: URI={}, причина={}",
+                    request.getRequestURI(), root.getMessage());
+            return buildResponse(
+                    HttpStatus.BAD_REQUEST,
+                    "Загрузка прервана клиентом",
+                    "Загрузка прервана клиентом",
+                    request);
+        }
+
+        if (root instanceof SizeLimitExceededException sizeEx) {
+            log.warn("Превышен лимит размера файла: {}", sizeEx.getMessage());
+            return buildResponse(
+                    HttpStatus.BAD_REQUEST,
+                    "Превышен лимит размера файла",
+                    "Поддерживаются файлы размера не более " + maxFileSize.toMegabytes() + " мегабайт",
+                    request);
+        }
+
+        log.error("Ошибка парсинга multipart-запроса: URI={}", request.getRequestURI(), ex);
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "Некорректный формат Multipart запроса",
+                "Некорректный формат запроса",
+                request);
+    }
 }

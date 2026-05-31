@@ -1,5 +1,7 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,6 +28,7 @@ import ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException;
 import ru.LevLezhnin.NauJava.exception.file.*;
 import ru.LevLezhnin.NauJava.exception.storagequotas.StorageQuotaExceededException;
 import ru.LevLezhnin.NauJava.mapper.FileResponseMapper;
+import ru.LevLezhnin.NauJava.metrics.FileMetrics;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.custom.ObjectStorageRepository;
 import ru.LevLezhnin.NauJava.repository.jpa.FileRepository;
@@ -103,6 +106,9 @@ class FileServiceImplUnitTest {
         lenient().doNothing().when(platformTransactionManager).commit(eq(mockTransactionStatus));
         lenient().doNothing().when(platformTransactionManager).rollback(eq(mockTransactionStatus));
 
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        FileMetrics fileMetrics = new FileMetrics(meterRegistry);
+
         fileService = new FileServiceImpl(
                 platformTransactionManager,
                 fileRepository,
@@ -113,7 +119,9 @@ class FileServiceImplUnitTest {
                 requestContextService,
                 passwordEncoder,
                 new FileResponseMapper(),
-                List.of(mockFileSearchStrategy)
+                List.of(mockFileSearchStrategy),
+                fileMetrics,
+                meterRegistry
         );
 
         fileService.setBaseUrl(API_BASE_URL);

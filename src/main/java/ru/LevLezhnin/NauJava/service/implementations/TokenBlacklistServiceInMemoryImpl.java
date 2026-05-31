@@ -3,8 +3,10 @@ package ru.LevLezhnin.NauJava.service.implementations;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import ru.LevLezhnin.NauJava.metrics.TokenBlacklistMetrics;
 import ru.LevLezhnin.NauJava.service.interfaces.TokenBlacklistService;
 
 import java.time.Duration;
@@ -24,7 +26,11 @@ public class TokenBlacklistServiceInMemoryImpl implements TokenBlacklistService 
     private final ConcurrentHashMap<String, Instant> blackList = new ConcurrentHashMap<>();
     private final ScheduledExecutorService cleanUpJobExecutor = Executors.newSingleThreadScheduledExecutor();
 
-    public TokenBlacklistServiceInMemoryImpl() {
+    private final TokenBlacklistMetrics tokenBlacklistMetrics;
+
+    @Autowired
+    public TokenBlacklistServiceInMemoryImpl(TokenBlacklistMetrics tokenBlacklistMetrics) {
+        this.tokenBlacklistMetrics = tokenBlacklistMetrics;
         cleanUpJobExecutor.scheduleAtFixedRate(this::cleanUp, 5, 5, TimeUnit.MINUTES);
     }
 
@@ -48,6 +54,7 @@ public class TokenBlacklistServiceInMemoryImpl implements TokenBlacklistService 
             return;
         }
         blackList.put(getTokenKey(token), Instant.now().plus(ttl));
+        tokenBlacklistMetrics.recordTokenBlacklisted(ttl);
         log.debug("Токен добавлен в черный список на {} сек", ttl.getSeconds());
     }
 
@@ -63,16 +70,19 @@ public class TokenBlacklistServiceInMemoryImpl implements TokenBlacklistService 
         Instant expiry = blackList.get(tokenKey);
         if (expiry == null) {
             log.debug("Токен не найден в чёрном списке");
+            tokenBlacklistMetrics.recordBlacklistCheck(false);
             return false;
         }
 
         if (Instant.now().isAfter(expiry)) {
             blackList.remove(tokenKey);
             log.debug("Токен удалён из чёрного списка по истечении");
+            tokenBlacklistMetrics.recordBlacklistCheck(false);
             return false;
         }
 
         log.debug("Токен найден в чёрном списке");
+        tokenBlacklistMetrics.recordBlacklistCheck(true);
         return true;
     }
 
@@ -90,6 +100,7 @@ public class TokenBlacklistServiceInMemoryImpl implements TokenBlacklistService 
             }
             return shouldRemove;
         });
+        tokenBlacklistMetrics.recordCleanup(countDeleted.get());
 
         log.info("Закончена очистка чёрного списка токенов. Удалено токенов: {}", countDeleted.get());
     }

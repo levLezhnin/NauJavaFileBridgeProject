@@ -15,10 +15,14 @@ RUN mvn -B -DskipTests package
 # 3. Используем JRE вместо JDK для уменьшения размера
 FROM eclipse-temurin:21-jre-alpine-3.20
 
-WORKDIR /app
-
 # 4. Создаем пользователя ДО копирования файлов, чтобы сразу настроить права
-RUN addgroup -S springuser && adduser -S springuser -G springuser
+RUN addgroup -S springuser &&  \
+    adduser -S springuser -G springuser && \
+    mkdir -p "/var/log/app" && \
+    chown -R springuser:springuser /var/log/app && \
+    chmod 755 /var/log/app
+
+WORKDIR /app
 
 # 5. Копируем конкретный jar
 COPY --from=builder --chown=springuser:springuser /app/target/*.jar app.jar

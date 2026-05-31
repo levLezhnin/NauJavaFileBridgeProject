@@ -1,5 +1,6 @@
 package ru.LevLezhnin.NauJava.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
@@ -57,8 +58,9 @@ public class FileCleanupConfig {
                                                        FileStatisticsRepository fileStatisticsRepository,
                                                        UserRepository userRepository,
                                                        ObjectStorageRepository fileStorageRepository,
-                                                       StorageQuotaService storageQuotaService) {
-        return new FileCleanupWriter(fileRepository, fileStatisticsRepository, userRepository, fileStorageRepository, storageQuotaService);
+                                                       StorageQuotaService storageQuotaService,
+                                                       MeterRegistry meterRegistry) {
+        return new FileCleanupWriter(fileRepository, fileStatisticsRepository, userRepository, fileStorageRepository, storageQuotaService, meterRegistry);
     }
 
     @Bean

@@ -1,5 +1,6 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,6 +17,7 @@ import ru.LevLezhnin.NauJava.exception.common.SelfActionForbiddenException;
 import ru.LevLezhnin.NauJava.exception.user.UserAlreadyBannedException;
 import ru.LevLezhnin.NauJava.exception.user.UserNotBannedException;
 import ru.LevLezhnin.NauJava.mapper.Mapper;
+import ru.LevLezhnin.NauJava.metrics.UserMetrics;
 import ru.LevLezhnin.NauJava.model.User;
 import ru.LevLezhnin.NauJava.model.UserBan;
 import ru.LevLezhnin.NauJava.model.UserRole;
@@ -64,7 +66,11 @@ class UserBanServiceImplUnitTest {
     @BeforeEach
     void setUp() {
         userBanService = new UserBanServiceImpl(
-                userRepository, userBanRepository, userBanResponseDtoMapper, requestContextService
+                userRepository,
+                userBanRepository,
+                userBanResponseDtoMapper,
+                requestContextService,
+                new UserMetrics(new SimpleMeterRegistry())
         );
 
         lenient().when(requestContextService.getUserId()).thenReturn(ADMIN_ID);

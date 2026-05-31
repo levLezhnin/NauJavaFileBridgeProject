@@ -1,5 +1,7 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -14,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import ru.LevLezhnin.NauJava.dto.auth.*;
 import ru.LevLezhnin.NauJava.dto.user.UserProfileResponseDto;
 import ru.LevLezhnin.NauJava.exception.auth.TokenRevokedException;
+import ru.LevLezhnin.NauJava.metrics.AuthMetrics;
 import ru.LevLezhnin.NauJava.security.userdetails.IdentifiableUserDetails;
 import ru.LevLezhnin.NauJava.security.userdetails.IdentifiableUserDetailsService;
 import ru.LevLezhnin.NauJava.security.utils.JwtTokenHelper;
@@ -55,12 +58,18 @@ class AuthServiceImplUnitTest {
 
     @BeforeEach
     void setUp() {
+
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        AuthMetrics authMetrics = new AuthMetrics(meterRegistry);
+
         authService = new AuthServiceImpl(
                 userDetailsService,
                 jwtTokenHelper,
                 authenticationManager,
                 userService,
-                tokenBlacklistService
+                tokenBlacklistService,
+                meterRegistry,
+                authMetrics
         );
 
         testUserProfile = new UserProfileResponseDto(

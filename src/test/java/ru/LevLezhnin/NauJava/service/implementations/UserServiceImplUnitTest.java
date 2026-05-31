@@ -1,5 +1,7 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,6 +26,7 @@ import ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException;
 import ru.LevLezhnin.NauJava.exception.user.EmailTakenException;
 import ru.LevLezhnin.NauJava.exception.user.InvalidLoginException;
 import ru.LevLezhnin.NauJava.exception.user.UsernameTakenException;
+import ru.LevLezhnin.NauJava.metrics.UserMetrics;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
 import ru.LevLezhnin.NauJava.repository.search.user.UserSearchStrategy;
@@ -64,12 +67,17 @@ class UserServiceImplUnitTest {
         mockUsernameSearchStrategy = mock(UserSearchStrategy.class);
         when(mockUsernameSearchStrategy.getCriteriaKey()).thenReturn("username");
 
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        UserMetrics userMetrics = new UserMetrics(meterRegistry);
+
         userService = new UserServiceImpl(
                 userRepository,
                 requestContextService,
                 passwordEncoder,
                 List.of(mockUsernameSearchStrategy),
-                storageQuotaService
+                storageQuotaService,
+                meterRegistry,
+                userMetrics
         );
 
         testAdminStorageQuota = StorageQuota.builder()

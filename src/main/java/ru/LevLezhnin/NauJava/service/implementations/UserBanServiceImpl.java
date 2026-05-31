@@ -13,6 +13,7 @@ import ru.LevLezhnin.NauJava.exception.common.SelfActionForbiddenException;
 import ru.LevLezhnin.NauJava.exception.user.UserAlreadyBannedException;
 import ru.LevLezhnin.NauJava.exception.user.UserNotBannedException;
 import ru.LevLezhnin.NauJava.mapper.Mapper;
+import ru.LevLezhnin.NauJava.metrics.UserMetrics;
 import ru.LevLezhnin.NauJava.model.User;
 import ru.LevLezhnin.NauJava.model.UserBan;
 import ru.LevLezhnin.NauJava.model.UserRole;
@@ -37,15 +38,19 @@ public class UserBanServiceImpl implements UserBanService {
 
     private final RequestContextService requestContextService;
 
+    private final UserMetrics userMetrics;
+
     @Autowired
     public UserBanServiceImpl(UserRepository userRepository,
                               UserBanRepository userBanRepository,
                               Mapper<UserBan, UserBanResponseDto> userBanResponseDtoMapper,
-                              RequestContextService requestContextService) {
+                              RequestContextService requestContextService,
+                              UserMetrics userMetrics) {
         this.userRepository = userRepository;
         this.userBanRepository = userBanRepository;
         this.userBanResponseDtoMapper = userBanResponseDtoMapper;
         this.requestContextService = requestContextService;
+        this.userMetrics = userMetrics;
     }
 
     private User checkAdminRightsAndReturnEntity(Long adminId) {
@@ -82,6 +87,7 @@ public class UserBanServiceImpl implements UserBanService {
                 userId, adminId);
 
         if (userId.equals(adminId)) {
+            userMetrics.recordSelfActionForbidden();
             throw new SelfActionForbiddenException("Нельзя заблокировать самого себя");
         }
 
@@ -131,6 +137,7 @@ public class UserBanServiceImpl implements UserBanService {
                 userId, adminId);
 
         if (userId.equals(adminId)) {
+            userMetrics.recordSelfActionForbidden();
             throw new SelfActionForbiddenException("Нельзя разблокировать самого себя");
         }
 

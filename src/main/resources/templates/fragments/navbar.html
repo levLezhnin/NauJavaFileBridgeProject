@@ -11,6 +11,7 @@
             <a th:href="@{/profile}" class="nav-link auth-only">Профиль</a>
             <a th:href="@{/admin/users/list}" class="nav-link auth-only admin-only">Пользователи</a>
             <a th:href="@{/admin/files/list}" class="nav-link auth-only admin-only">Все файлы системы</a>
+            <a th:href="${grafanaUrl}" class="nav-link auth-only admin-only">Мониторинг</a>
             <a th:href="@{/login}" class="nav-link guest-only">Войти</a>
             <a th:href="@{/register}" class="nav-link guest-only">Регистрация</a>
             <button id="logoutButton" type="button" class="btn btn-secondary auth-only">Выйти</button>

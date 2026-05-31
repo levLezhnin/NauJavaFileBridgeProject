@@ -1,5 +1,7 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,7 @@ import ru.LevLezhnin.NauJava.exception.common.InvalidSearchCriteriaException;
 import ru.LevLezhnin.NauJava.exception.user.EmailTakenException;
 import ru.LevLezhnin.NauJava.exception.user.InvalidLoginException;
 import ru.LevLezhnin.NauJava.exception.user.UsernameTakenException;
+import ru.LevLezhnin.NauJava.metrics.UserMetrics;
 import ru.LevLezhnin.NauJava.model.*;
 import ru.LevLezhnin.NauJava.repository.jpa.UserRepository;
 import ru.LevLezhnin.NauJava.repository.search.user.UserSearchStrategy;
@@ -44,17 +47,24 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncryptor;
     private final StorageQuotaService storageQuotaService;
 
+    private final MeterRegistry meterRegistry;
+    private final UserMetrics userMetrics;
+
     @Autowired
     public UserServiceImpl(UserRepository userRepository,
                            RequestContextService requestContextService,
                            PasswordEncoder passwordEncryptor,
                            List<UserSearchStrategy> userSearchStrategies,
-                           StorageQuotaService storageQuotaService) {
+                           StorageQuotaService storageQuotaService,
+                           MeterRegistry meterRegistry,
+                           UserMetrics userMetrics) {
         this.userRepository = userRepository;
         this.requestContextService = requestContextService;
         this.passwordEncryptor = passwordEncryptor;
         this.userSearchStrategyMap = userSearchStrategies.stream().collect(Collectors.toMap(UserSearchStrategy::getCriteriaKey, s -> s));
         this.storageQuotaService = storageQuotaService;
+        this.meterRegistry = meterRegistry;
+        this.userMetrics = userMetrics;
     }
 
     private User findById(long id) {
@@ -69,12 +79,14 @@ public class UserServiceImpl implements UserService {
 
     private void checkUsernameUnique(String username) {
         if (userRepository.findByUsername(username).isPresent()) {
+            userMetrics.recordUsernameConflict();
             throw new UsernameTakenException("Пользователь с логином '%s' уже существует".formatted(username));
         }
     }
 
     private void checkEmailUnique(String email) {
         if (userRepository.findByEmail(email).isPresent()) {
+            userMetrics.recordEmailConflict();
             throw new EmailTakenException("Пользователь с E-mail-ом '%s' уже существует".formatted(email));
         }
     }
@@ -82,6 +94,8 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserProfileResponseDto createUser(RegistrationRequestDto registrationRequestDto) {
+
+        Timer.Sample userCreateStart = Timer.start(meterRegistry);
 
         checkUsernameUnique(registrationRequestDto.username());
         checkEmailUnique(registrationRequestDto.email());
@@ -99,6 +113,7 @@ public class UserServiceImpl implements UserService {
 
         try {
             userRepository.save(user);
+            userMetrics.recordUserCreated(userCreateStart);
         } catch (DataIntegrityViolationException e) {
             checkUsernameUnique(user.getUsername());
             checkEmailUnique(user.getEmail());
@@ -121,6 +136,7 @@ public class UserServiceImpl implements UserService {
     public UserProfileResponseDto getProfile() {
         User user = getUserByAuthentication();
         log.debug("Запрошен профиль. ID: {}", user.getId());
+        userMetrics.recordProfileViewed();
         return new UserProfileResponseDto(
                 user.getUsername(),
                 user.getEmail(),
@@ -132,6 +148,8 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void updateUser(UpdateUserRequestDto updateUserRequestDto) {
+
+        Timer.Sample userUpdateStart = Timer.start(meterRegistry);
 
         User user = getUserByAuthentication();
         List<String> changedFields = new ArrayList<>();
@@ -147,9 +165,11 @@ public class UserServiceImpl implements UserService {
 
         if (updateUserRequestDto.containsNewPassword()) {
             if (passwordEncryptor.matches(updateUserRequestDto.newPassword(), user.getPasswordHash())) {
+                userMetrics.recordPasswordUpdateFailure();
                 throw new InvalidPasswordException("Новый пароль должен отличаться от старого");
             }
             if (!passwordEncryptor.matches(updateUserRequestDto.currentPassword(), user.getPasswordHash())) {
+                userMetrics.recordPasswordUpdateFailure();
                 throw new InvalidPasswordException("Указан неверный текущий пароль");
             }
             user.setPasswordHash(passwordEncryptor.encode(updateUserRequestDto.newPassword()));
@@ -159,11 +179,15 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
 
         log.info("Профиль пользователя обновлён. ID: {}, Изменённые поля: [{}]", user.getId(), changedFields);
+        userMetrics.recordUserUpdated(userUpdateStart);
     }
 
     @Override
     @Transactional
     public void deleteUser() {
+
+        Timer.Sample deleteUserStart = Timer.start(meterRegistry);
+
         User user = getUserByAuthentication();
 
         Long userId = user.getId();
@@ -189,6 +213,7 @@ public class UserServiceImpl implements UserService {
         userRepository.delete(user);
 
         log.warn("Пользователь удалён. ID: {}, Логин: {}. Связи с банами и файлами успешно очищены.", userId, username);
+        userMetrics.recordUserDeleted(deleteUserStart);
     }
 
     private User checkAdminRightsAndReturnEntity(Long adminId) {

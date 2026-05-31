@@ -1,7 +1,7 @@
 spring:
 
   application:
-    name: NauJava
+    name: file-bridge
 
   config:
     import: optional:file:.env[.properties]
@@ -30,7 +30,7 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 200MB
-      file-size-threshold: 100MB
+      file-size-threshold: 10MB
 
   error:
     whitelabel:
@@ -56,10 +56,13 @@ app:
   api:
     base-url: ${API_BASE_URL}
 
+  grafana:
+    url: ${GRAFANA_URL}
+
   quotas:
     tariffs:
       BASIC:
-        maxStorageSize: 10GB
+        maxStorageSize: 1GB
 
   default:
     default-admin:
@@ -78,8 +81,8 @@ app:
 jwt:
   accessSecret: ${ACCESS_JWT_SECRET}
   refreshSecret: ${REFRESH_JWT_SECRET}
-  accessTokenLifetime: 30m
-  refreshTokenLifetime: 1d
+  accessTokenLifetime: 2h
+  refreshTokenLifetime: 14d
 
 cookie:
   path: /

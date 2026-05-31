@@ -9,6 +9,7 @@ import ru.LevLezhnin.NauJava.config.properties.QuotaProperties;
 import ru.LevLezhnin.NauJava.dto.storageQuotas.StorageQuotaResponseDto;
 import ru.LevLezhnin.NauJava.exception.common.EntityNotFoundException;
 import ru.LevLezhnin.NauJava.exception.storagequotas.StorageQuotaExceededException;
+import ru.LevLezhnin.NauJava.metrics.StorageQuotaMetrics;
 import ru.LevLezhnin.NauJava.model.StorageQuota;
 import ru.LevLezhnin.NauJava.repository.jpa.StorageQuotaRepository;
 import ru.LevLezhnin.NauJava.security.context.RequestContextService;
@@ -23,12 +24,17 @@ public class StorageQuotaServiceImpl extends AbstractStorageQuotaService {
 
     private final StorageQuotaRepository storageQuotaRepository;
     private final RequestContextService requestContextService;
+    private final StorageQuotaMetrics storageQuotaMetrics;
 
     @Autowired
-    public StorageQuotaServiceImpl(QuotaProperties quotaProperties, StorageQuotaRepository storageQuotaRepository, RequestContextService requestContextService) {
+    public StorageQuotaServiceImpl(QuotaProperties quotaProperties,
+                                   StorageQuotaRepository storageQuotaRepository,
+                                   RequestContextService requestContextService,
+                                   StorageQuotaMetrics storageQuotaMetrics) {
         super(quotaProperties);
         this.storageQuotaRepository = storageQuotaRepository;
         this.requestContextService = requestContextService;
+        this.storageQuotaMetrics = storageQuotaMetrics;
     }
 
     private StorageQuota getEntityByIdWithLock(Long storageQuotaId) {
@@ -56,12 +62,14 @@ public class StorageQuotaServiceImpl extends AbstractStorageQuotaService {
         if (maxStorageBytes < newUsedStorageBytes) {
             log.warn("Превышение квоты хранилища. ID квоты: {}, Запрошено байт: {}, Лимит байт: {}, Осталось байт: {}",
                     storageQuotaId, deltaBytes, maxStorageBytes, maxStorageBytes - currentUsedStorageBytes);
+            storageQuotaMetrics.recordQuotaUpdateRejected();
             throw new StorageQuotaExceededException("Превышен лимит хранилища: %d байт из %d возможных".formatted(newUsedStorageBytes, maxStorageBytes));
         }
 
         storageQuota.setUsedStorageBytes(newUsedStorageBytes);
         storageQuota.setUpdatedAt(Instant.now());
         storageQuotaRepository.save(storageQuota);
+        storageQuotaMetrics.recordQuotaUpdateSuccess(newUsedStorageBytes, maxStorageBytes);
     }
 
     @Override

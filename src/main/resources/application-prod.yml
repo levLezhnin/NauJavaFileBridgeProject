@@ -21,10 +21,30 @@ minio:
     keep-alive-duration: 5m
 
 management:
+  metrics:
+    enable:
+      spring.batch: true
+      hikaricp: true
+    tags:
+      application: ${spring.application.name:file-bridge}
+
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+
   endpoint:
+    prometheus:
+      enabled: true
     health:
       show-details: when-authorized
+
+logging:
+  file:
+    name: /var/log/app/file-bridge.log
+    max-size: 10MB
+    max-history: 10
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

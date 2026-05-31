@@ -45,6 +45,24 @@ function validateRegisterForm(username, email, password) {
   return errors;
 }
 
+function validateLoginForm(username, password) {
+  const errors = [];
+  if (!username || username.trim().length === 0) {
+    errors.push('Имя пользователя не может быть пустым');
+  } else if (username.length < 3 || username.length > 255) {
+    // allow slightly shorter username for login convenience while register enforces 5 chars
+    errors.push('Имя пользователя должно иметь длину от 3 до 255 символов');
+  }
+
+  if (!password || password.trim().length === 0) {
+    errors.push('Пароль не может быть пустым');
+  } else if (password.length < 8) {
+    errors.push('Длина пароля должна быть не менее 8 символов');
+  }
+
+  return errors;
+}
+
 function showValidationSummary(message, errors) {
   const summary = document.querySelector('#validationSummary');
   if (summary) {
@@ -111,7 +129,7 @@ function prepareAuthForm(formId, url) {
     const payload = {};
     formData.forEach((value, key) => (payload[key] = value));
 
-    // Client-side validation for registration form
+    // Client-side validation for registration and login forms
     if (formId === 'registerForm') {
       const username = payload.username?.trim() || '';
       const email = payload.email?.trim() || '';
@@ -132,6 +150,26 @@ function prepareAuthForm(formId, url) {
         }
         if (!password || password.length < 8 || password.length > 255 || !/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[?!@#$%^&*()+_\-])/.test(password)) {
           showFieldError('registerPassword', 'Пароль должен содержать латинские буквы верхнего и нижнего регистров, цифру и специальный символ');
+        }
+        return;
+      }
+    }
+
+    if (formId === 'loginForm') {
+      const username = payload.username?.trim() || '';
+      const password = payload.password || '';
+
+      hideValidationSummary();
+      clearAllFieldErrors(form);
+
+      const errors = validateLoginForm(username, password);
+      if (errors.length > 0) {
+        showValidationSummary('Пожалуйста, исправьте ошибки в форме', errors);
+        if (!username || username.length < 3 || username.length > 255) {
+          showFieldError('loginUsername', 'Имя пользователя должно иметь длину от 3 до 255 символов');
+        }
+        if (!password || password.length < 8) {
+          showFieldError('loginPassword', 'Длина пароля должна быть не менее 8 символов');
         }
         return;
       }

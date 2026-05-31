@@ -1,11 +1,13 @@
 package ru.LevLezhnin.NauJava.service.implementations;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.LevLezhnin.NauJava.metrics.TokenBlacklistMetrics;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -23,7 +25,8 @@ class TokenBlacklistServiceInMemoryImplUnitTest {
 
     @BeforeEach
     void setUp() {
-        tokenBlacklistService = new TokenBlacklistServiceInMemoryImpl();
+        TokenBlacklistMetrics tokenBlacklistMetrics = new TokenBlacklistMetrics(new SimpleMeterRegistry());
+        tokenBlacklistService = new TokenBlacklistServiceInMemoryImpl(tokenBlacklistMetrics);
     }
 
     @Nested

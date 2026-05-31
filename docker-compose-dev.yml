@@ -29,7 +29,63 @@ services:
       - minio_data:/data
     command: server /data --console-address ":9001"
 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    volumes:
+      - ./observability/dev/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+      - "7946:7946"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./observability/dev/loki-config.yml:/etc/loki/loki-config.yml
+      - loki_data:/loki
+    user: "10001:10001"
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - ./observability/dev/promtail-config.yml:/etc/promtail/config.yml
+      - ./logs:/var/log/app
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    env_file:
+      - .env
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - monitoring
 
 volumes:
   postgres_data:
   minio_data:
+  prometheus_data:
+  loki_data:
+  grafana_data:
+
+networks:
+  monitoring:
+    driver: bridge

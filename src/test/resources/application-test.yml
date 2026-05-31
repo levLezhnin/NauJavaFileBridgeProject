@@ -28,6 +28,8 @@ minio:
 app:
   api:
     base-url: http://localhost:8080
+  grafana:
+    url: http://localhost:3000
   default:
     default-admin:
       username: DefaultAdmin

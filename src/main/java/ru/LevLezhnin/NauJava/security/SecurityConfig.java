@@ -90,6 +90,9 @@ public class SecurityConfig {
                         // Публичный API
                         .requestMatchers("/api/**").hasAnyRole(UserRole.USER.name(), UserRole.ADMIN.name())
 
+                        // Мониторинг
+                        .requestMatchers("/internal/visualizer-access").hasRole(UserRole.ADMIN.name())
+
                         // Другое
                         .anyRequest().authenticated())
 
@@ -149,6 +152,11 @@ public class SecurityConfig {
     }
 
     private boolean isFrontendRequest(HttpServletRequest request) {
+
+        if (request.getRequestURI().startsWith("/internal/")) {
+            return false;
+        }
+
         String accept = request.getHeader("Accept");
         return accept != null && accept.contains("text/html");
     }

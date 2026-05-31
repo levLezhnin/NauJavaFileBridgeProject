@@ -791,6 +791,14 @@ function validateUploadForm(file, ttl, maxDownloads, password) {
   if (password && (password.length < 6 || password.length > 64)) {
     errors.push('Длина пароля должна быть от 6 до 64 символов');
   }
+
+  // Password character set validation (match backend: letters, digits and allowed specials)
+  if (password && password.trim().length > 0) {
+    const pwPattern = /^[a-zA-Z0-9#?@\$%\^&\*-]{6,64}$/;
+    if (!pwPattern.test(password)) {
+      errors.push('Пароль может содержать только латинские буквы, цифры и символы # ? @ $ % ^ & * -');
+    }
+  }
   
   return errors;
 }
@@ -917,7 +925,14 @@ uploadForm.addEventListener('submit', async (e) => {
        else if (file.size > maxFileSizeBytes) showFieldError('dropzone', 'Размер файла не должен превышать ' + formatBytes(maxFileSizeBytes));
        if (isNaN(ttl) || ttl < 1 || ttl > 14 || ttl % 1 !== 0) showFieldError('ttl', 'Срок жизни должен быть целым числом от 1 до 14 дней');
        if (isNaN(maxDownloads) || maxDownloads < 1 || maxDownloads > 1000 || maxDownloads % 1 !== 0) showFieldError('maxDownloads', 'Максимум скачиваний должен быть целым числом от 1 до 1000');
-       if (password && (password.length < 6 || password.length > 64)) showFieldError('password', 'Длина пароля должна быть от 6 до 64 символов');
+       if (password) {
+         const pwPattern = /^[a-zA-Z0-9#?@\$%\^&\*-]{6,64}$/;
+         if (password.length < 6 || password.length > 64) {
+           showFieldError('password', 'Длина пароля должна быть от 6 до 64 символов');
+         } else if (!pwPattern.test(password)) {
+           showFieldError('password', 'Пароль может содержать только латинские буквы, цифры и символы # ? @ $ % ^ & * -');
+         }
+       }
        return;
      }
 
@@ -962,9 +977,44 @@ uploadForm.addEventListener('submit', async (e) => {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve();
                     } else {
-                        let errMsg = 'Ошибка загрузки файла';
-                        try { const resp = JSON.parse(xhr.responseText); errMsg = resp.message || errMsg; } catch (_) {}
-                        reject(new Error(errMsg));
+                    let errMsg = 'Ошибка загрузки файла';
+                    try {
+                      const resp = JSON.parse(xhr.responseText);
+                      // If backend returned fieldErrors, display them next to fields
+                      if (resp && resp.fieldErrors && Array.isArray(resp.fieldErrors) && resp.fieldErrors.length > 0) {
+                        // Aggregate messages per field
+                        const fieldErrorsMap = {};
+                        resp.fieldErrors.forEach(fe => {
+                          const field = fe.field || fe.property || 'payload';
+                          const message = fe.message || fe.defaultMessage || fe;
+                          if (!fieldErrorsMap[field]) fieldErrorsMap[field] = [];
+                          fieldErrorsMap[field].push(message);
+                        });
+
+                        // Show field errors for known fields: 'password', 'ttl_minutes', 'max_downloads', 'fileName', 'fileSize', 'contentType'
+                        Object.entries(fieldErrorsMap).forEach(([field, messages]) => {
+                          const normalized = field.toLowerCase();
+                          if (normalized.includes('password')) {
+                            showFieldError('password', messages.join(' '));
+                          } else if (normalized.includes('ttl') || normalized.includes('ttl_minutes')) {
+                            showFieldError('ttl', messages.join(' '));
+                          } else if (normalized.includes('max') || normalized.includes('downloads')) {
+                            showFieldError('maxDownloads', messages.join(' '));
+                          } else if (normalized.includes('file') || normalized.includes('filename')) {
+                            showFieldError('dropzone', messages.join(' '));
+                          } else {
+                            // fallback: show general summary
+                            showValidationSummary(messages.join(' '));
+                          }
+                        });
+
+                        // Also provide a top-level message if available
+                        if (resp.message) errMsg = resp.message;
+                      } else {
+                        errMsg = resp.message || errMsg;
+                      }
+                    } catch (_) {}
+                    reject(new Error(errMsg));
                     }
                 };
                 xhr.onerror = () => reject(new Error('Сетевая ошибка при загрузке'));

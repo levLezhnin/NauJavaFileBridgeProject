@@ -33,7 +33,6 @@ public class RequestContextService {
     public Long getUserId() {
         Long id = userId.get();
         if (id == null) {
-            log.warn("Не установлен userId в контексте запроса. Возможная ошибка безопасности.");
             throw new AuthenticationCredentialsNotFoundException("Пользователь не авторизован");
         }
         return id;
